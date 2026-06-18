@@ -16,7 +16,7 @@ The product positioning is:
 
 > **Octowiz — the coding tentacle of ÆLLI.**
 
-Octowiz is not a standalone chatbot, not just another coding wrapper, and not merely an AI coding assistant. Octowiz is the multiplayer coding layer of ÆLLI: the place where humans, coding agents, validators, reviewers, and higher-level orchestration meet inside shared engineering rooms.
+Octowiz is the coding tentacle of ÆLLI: the OpenCode-first execution layer for shared coding rooms, agent coordination, skill routing, review doctrine, validation loops, and delivery workflows.
 
 ---
 
@@ -46,19 +46,21 @@ Octowiz exists to make that possible.
 
 ### ÆLLI
 
-ÆLLI is the higher-level intelligence and control brain.
+ÆLLI is the top-level intelligence and main brain of the framework. Repo-based, ÆLLI is the A2A control plane for routing, memory, engineering knowledge, multi-model orchestration, and escalation.
 
 ÆLLI is responsible for:
 
-- strategic reasoning
-- system-level architecture guidance
-- doctrine and quality principles
-- cross-room awareness
-- escalation when smaller agents are stuck
-- high-level decision support
-- final advisory judgment when there is uncertainty
+- A2A routing and agent-card based skill dispatch
+- memory and engineering knowledge integration
+- multi-model orchestration through LiteLLM/model routes
+- task classification and escalation routing
+- generation-review workflow control
+- preventing a generator from approving its own output
+- senior architecture, risk, and conflict escalation
+- cross-room and cross-session intelligence
+- persisting reusable project experience and playbooks
 
-ÆLLI is not the low-level coding worker. ÆLLI is the intelligence layer that can guide, evaluate, arbitrate, and escalate.
+ÆLLI is not the low-level coding worker and not the shared coding UI. ÆLLI is the main brain / control plane that routes, remembers, advises, escalates, and coordinates the intelligence layer behind Octowiz.
 
 ### Octowiz
 
@@ -79,8 +81,8 @@ Octowiz is responsible for:
 In short:
 
 ```text
-ÆLLI = higher-level intelligence / control brain
-Octowiz = coding layer / multiplayer engineering tentacle
+ÆLLI = main brain / A2A control plane / routing, memory, orchestration, escalation
+Octowiz = coding tentacle / OpenCode-first multiplayer execution layer
 ```
 
 ---
@@ -257,6 +259,8 @@ The system should feel like a powerful engineering cockpit, not a black box.
 
 ## 8. Initial Architecture
 
+Octowiz-v2 should be a monorepo that combines the relevant parts of the existing ÆLLI and Octowiz directions into one integrated framework. This does not mean simply copying both repositories into one folder. It means designing one monorepo where ÆLLI provides the top-level intelligence/control plane and Octowiz provides the coding execution layer required by the new OpenCode/Zellij workflow.
+
 The initial architecture should combine four major layers:
 
 ```text
@@ -321,6 +325,55 @@ The purpose of Octowiz-v2 is to build the new multiplayer Vibecoding architectur
 
 Octowiz-v2 should not spend MVP effort on Claude Code compatibility, Claude Code adapters, or migration support from Octowiz v1 unless Janis explicitly approves it later.
 
+### 8.3.1 Monorepo Integration Strategy
+
+Octowiz-v2 should be designed as the new integrated monorepo for the combined ÆLLI + Octowiz framework.
+
+The monorepo should preserve a clear separation of responsibility:
+
+```text
+ÆLLI = main brain / A2A control plane / memory / routing / model orchestration / escalation
+Octowiz = coding tentacle / OpenCode-first execution layer / rooms / agents / skills / validation / delivery
+```
+
+The purpose of combining the repos is not to blur the product concepts. It is to allow the coding workflow to work as one system:
+
+- ÆLLI provides routing, memory, model orchestration, engineering knowledge, and escalation.
+- Octowiz provides shared Zellij rooms, OpenCode execution, sandboxed room runtime, agent coordination, skill composition, validation, review loops, GitHub delivery, and Arena Mode.
+- The skill runtime, room ledger, and escalation protocol should be shared across the monorepo.
+- Existing ÆLLI capabilities may need to be adapted so their old Claude Code assumptions are replaced by OpenCode/Zellij-aware interfaces.
+- Existing Octowiz concepts may need to be rebuilt as Octowiz-v2-native packages rather than imported unchanged from v1.
+
+Suggested monorepo package direction:
+
+```text
+apps/
+├── aelli-control-plane/
+├── octowiz-api/
+├── octowiz-web/
+└── octowiz-worker/
+
+packages/
+├── a2a-gateway/
+├── memory/
+├── model-router/
+├── engineering-knowledge/
+├── room-ledger/
+├── zellij-adapter/
+├── opencode-adapter/
+├── sandbox-runtime/
+├── agent-runtime/
+├── skill-runtime/
+├── validation/
+├── github-adapter/
+├── arena-runtime/
+└── doctrine/
+```
+
+The architectural rule is:
+
+> ÆLLI is the main brain. Octowiz is the coding tentacle. The monorepo exists so both can operate as one coherent engineering framework.
+
 ### 8.4 Octowiz Orchestration Layer
 
 Octowiz coordinates the coding process.
@@ -341,21 +394,25 @@ Responsibilities:
 
 Octowiz decides who does what, in which room, under which quality rules.
 
-### 8.5 ÆLLI Advisory Layer
+### 8.5 ÆLLI Main Brain / Control Plane Layer
 
-ÆLLI provides higher-level reasoning and control.
+ÆLLI provides the top-level intelligence of the framework. In octowiz-v2, ÆLLI should be adapted where necessary so it can operate as the main brain for the new OpenCode/Zellij-based workflow instead of remaining only tied to the older Claude Code-oriented v1 workflow.
 
 Responsibilities:
 
-- architecture guidance
-- doctrine management
+- A2A gateway and skill routing
+- model routing and multi-model orchestration
+- memory, engineering knowledge, and playbook retrieval
+- cross-room awareness
 - escalation support
+- architecture guidance
 - conflict resolution
 - reasoning over failed validation
-- advice for stuck agents
-- strategic product and technical direction
+- senior review and risk assessment
+- advisor routing for stronger models
+- preserving no-self-review workflow separation
 
-ÆLLI is called when the local process needs stronger reasoning.
+ÆLLI is called when the local process, Qwen workers, skill composition, reviewers, or humans need stronger reasoning, architecture judgment, or escalation. ÆLLI should not replace Octowiz as the coding execution layer; it coordinates and empowers it.
 
 ---
 
@@ -1614,34 +1671,6 @@ skill-conflict-resolver.ts
 skill-ledger-recorder.ts
 ```
 
-### `arena-runtime`
-
-Responsible for:
-
-- creating Arena Mode tasks
-- creating one isolated lane per participant/configuration
-- storing lane configuration, model settings, skill settings, and sandbox policy
-- launching parallel arena executions
-- collecting implementation plans, diffs, tests, validation results, review notes, and cost/runtime metrics
-- presenting side-by-side comparison artifacts
-- supporting human ranking and rubric scoring
-- supporting future pairwise ranking, Elo, or Bradley-Terry scoring
-- supporting optional LLM-as-a-judge assistance while keeping human judgment authoritative for MVP
-- generating a synthesis plan from the strongest parts of competing lane outputs
-- recording arena results, scores, winner, synthesis decisions, and final candidate status in the room ledger
-
-Initial files:
-
-```text
-arena-task.ts
-arena-lane.ts
-arena-runner.ts
-arena-artifact-collector.ts
-arena-ranking.ts
-arena-synthesis-planner.ts
-arena-ledger-recorder.ts
-```
-
 ### `sandbox-runtime`
 
 Responsible for:
@@ -1764,23 +1793,6 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 - Define when Diagnosis Gate blocks autonomous fixes
 - Define early steering checkpoints before agent execution
 - Produce the first `skills/registry.json` based on the audit
-
-
-### Milestone 2.5: Arena Mode Research and Prototype
-
-- Research existing OSS arena/evaluation systems before building custom infrastructure
-- Decide which OSS concepts/components can be reused for Octowiz Arena Mode
-- Define `docs/arena-mode.md`
-- Define `docs/arena-ranking-rubric.md`
-- Define `examples/arena-task.example.json`
-- Add `packages/arena-runtime/`
-- Implement three-lane arena task metadata for Janis, Boris, and Dennis
-- Support custom agent/skill/model settings per lane
-- Collect lane artifacts: plan, diff, tests, validation, review, risk notes, cost, and runtime
-- Add side-by-side comparison output
-- Add human ranking and rubric scoring
-- Add synthesis plan generation from the best parts of each lane
-- Record arena results in the room ledger
 
 ### Milestone 3: Sandbox Runtime Foundation
 
