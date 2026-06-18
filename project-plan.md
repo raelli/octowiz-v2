@@ -46,11 +46,12 @@ Octowiz exists to make that possible.
 
 ### ÆLLI
 
-ÆLLI is the higher-level intelligence and control brain.
+ÆLLI is the higher-level intelligence, orchestration brain, and A2A gateway.
 
 ÆLLI is responsible for:
 
 - strategic reasoning
+- A2A orchestration and gateway routing
 - system-level architecture guidance
 - doctrine and quality principles
 - cross-room awareness
@@ -58,11 +59,11 @@ Octowiz exists to make that possible.
 - high-level decision support
 - final advisory judgment when there is uncertainty
 
-ÆLLI is not the low-level coding worker. ÆLLI is the intelligence layer that can guide, evaluate, arbitrate, and escalate.
+ÆLLI is not the low-level coding worker. ÆLLI is the intelligence and orchestration layer that can guide, evaluate, arbitrate, route, and escalate.
 
 ### Octowiz
 
-Octowiz is the coding tentacle of ÆLLI.
+Octowiz is the coding tentacle of ÆLLI and the engineering workflow, skill, and doctrine layer for Octowiz-v2.
 
 Octowiz is responsible for:
 
@@ -79,8 +80,8 @@ Octowiz is responsible for:
 In short:
 
 ```text
-ÆLLI = higher-level intelligence / control brain
-Octowiz = coding layer / multiplayer engineering tentacle
+ÆLLI = higher-level intelligence / orchestration brain / A2A gateway
+Octowiz = engineering workflow / skill / doctrine layer and multiplayer coding tentacle
 ```
 
 ---
@@ -147,9 +148,40 @@ Octowiz should make AI-assisted engineering feel less like prompting a single as
 
 ---
 
-## 6. Key Principles
+## 6. Human Collaboration Roles
 
-### 6.1 Multiplayer First
+The initial human collaboration model is:
+
+- Janis: product owner, system designer, and primary steering authority
+- Bo: active Vibecoding collaborator
+- Dennis: technical advisor, reviewer, and architecture sparring partner; optionally an active coding participant when explicitly needed
+
+Dennis' feedback must be treated as technical advisory input, especially around developer steering, workflow control, architecture risk, code quality, and engineering practicality.
+
+Dennis may join coding rooms as an active contributor, but the default assumption for the MVP is that he primarily advises, reviews, challenges assumptions, and helps steer architecture and implementation quality.
+
+Dennis should therefore be represented in Octowiz as both:
+
+```text
+default role: technical advisor / reviewer
+optional role: active coder
+```
+
+Octowiz should allow Dennis to:
+
+- review plans before execution
+- review implementation proposals
+- challenge architecture decisions
+- inspect diffs
+- request changes
+- join a shared Zellij/OpenCode room
+- actively code when invited into that role
+
+---
+
+## 7. Key Principles
+
+### 7.1 Multiplayer First
 
 Octowiz should be designed as a multiplayer system from the beginning.
 
@@ -159,7 +191,7 @@ This is why **Zellij** is a core part of the architecture.
 
 Zellij provides the native shared terminal/session model needed for real multiplayer coding.
 
-### 6.2 OpenCode as the Coding Cockpit
+### 7.2 OpenCode as the Coding Cockpit
 
 OpenCode should be treated as the primary coding cockpit.
 
@@ -171,7 +203,7 @@ The principle is:
 
 > Zellij provides the multiplayer room. OpenCode provides the coding cockpit. Octowiz orchestrates the engineering workflow.
 
-### 6.3 Doctrine Over Raw Model Power
+### 7.3 Doctrine Over Raw Model Power
 
 Octowiz should not depend on every agent being a frontier model.
 
@@ -188,7 +220,7 @@ Quality should come from process:
 
 This is especially important for setups using local models such as Qwen running on private GPU infrastructure.
 
-### 6.4 No Self-Review
+### 7.4 No Self-Review
 
 A core doctrine rule:
 
@@ -206,7 +238,7 @@ Agent C validates.
 Human approves merge.
 ```
 
-### 6.5 Human Steering Remains Central
+### 7.5 Human Steering Remains Central
 
 Octowiz is not designed to remove humans from the engineering process.
 
@@ -224,7 +256,7 @@ The system should feel like a powerful engineering cockpit, not a black box.
 
 ---
 
-## 7. Initial Architecture
+## 8. Initial Architecture
 
 The initial architecture should combine four major layers:
 
@@ -241,9 +273,9 @@ The initial architecture should combine four major layers:
 
 ---
 
-## 8. System Layers
+## 9. System Layers
 
-### 8.1 Zellij Multiplayer Layer
+### 9.1 Zellij Multiplayer Layer
 
 Zellij provides the multiplayer execution environment.
 
@@ -258,7 +290,7 @@ Responsibilities:
 
 Zellij is the room.
 
-### 8.2 OpenCode Layer
+### 9.2 OpenCode Layer
 
 OpenCode provides the coding cockpit.
 
@@ -273,7 +305,24 @@ Responsibilities:
 
 OpenCode is where code is actually written and modified.
 
-### 8.3 Octowiz Orchestration Layer
+### 9.3 Coding Runtime Strategy
+
+Octowiz-v2 is OpenCode-first.
+
+Octowiz-v2 does not aim to remain Claude Code compatible. Claude Code compatibility belongs to the existing Octowiz v1 line.
+
+The purpose of Octowiz-v2 is to build the new multiplayer Vibecoding architecture around:
+
+- OpenCode as the coding runtime
+- Zellij as the shared multiplayer room
+- Octowiz as the engineering workflow, memory, routing, role-orchestration, skill, and doctrine layer
+- ÆLLI as orchestration brain, senior advisor, and A2A gateway
+- Qwen 35B on the Trooper GPU Server as local worker, reviewer, and fixer model
+- stronger models through ÆLLI only for escalation, architecture, risk, ambiguity, and conflict resolution
+
+Octowiz-v2 should not spend MVP effort on Claude Code compatibility, Claude Code adapters, or migration support from Octowiz v1 unless Janis explicitly approves it later.
+
+### 9.4 Octowiz Orchestration Layer
 
 Octowiz coordinates the coding process.
 
@@ -293,25 +342,26 @@ Responsibilities:
 
 Octowiz decides who does what, in which room, under which quality rules.
 
-### 8.4 ÆLLI Advisory Layer
+### 9.5 ÆLLI Orchestration Brain and A2A Gateway
 
-ÆLLI provides higher-level reasoning and control.
+ÆLLI provides higher-level reasoning, orchestration control, and A2A gateway routing.
 
 Responsibilities:
 
 - architecture guidance
 - doctrine management
 - escalation support
+- A2A gateway routing
 - conflict resolution
 - reasoning over failed validation
 - advice for stuck agents
 - strategic product and technical direction
 
-ÆLLI is called when the local process needs stronger reasoning.
+ÆLLI is called when the local process needs stronger reasoning, model escalation, cross-agent routing, architecture judgment, or conflict resolution.
 
 ---
 
-### 8.5 Sandbox Runtime
+## 10. Sandbox Runtime
 
 Octowiz uses a dedicated **Sandbox Runtime** as a core architecture layer.
 
@@ -422,11 +472,11 @@ The final product principle:
 
 ---
 
-## 9. Room Model
+## 11. Room Model
 
 Octowiz should support multiple room types.
 
-### 9.1 Shared Coding Room
+### 11.1 Shared Coding Room
 
 A shared coding room is used for live collaboration.
 
@@ -451,7 +501,7 @@ Use cases:
 - architectural exploration
 - human-guided implementation
 
-### 9.2 Parallel Task Room
+### 11.2 Parallel Task Room
 
 A parallel task room is used when several tasks should be worked on at the same time.
 
@@ -473,7 +523,7 @@ Each room may have its own:
 - task ledger
 - validation state
 
-### 9.3 Review Room
+### 11.3 Review Room
 
 A review room is focused only on critique and improvement.
 
@@ -486,7 +536,7 @@ Use cases:
 - refactor suggestions
 - merge readiness review
 
-### 9.4 Validation Room
+### 11.4 Validation Room
 
 A validation room is focused on running checks.
 
@@ -501,11 +551,11 @@ Use cases:
 
 ---
 
-## 10. Agent Roles
+## 12. Agent Roles
 
 Octowiz should support explicit agent roles.
 
-### 10.1 Planner Agent
+### 12.1 Planner Agent
 
 Creates or refines the implementation plan.
 
@@ -517,7 +567,7 @@ Responsibilities:
 - identify risks
 - define validation requirements
 
-### 10.2 Implementation Agent
+### 12.2 Implementation Agent
 
 Writes the code.
 
@@ -530,7 +580,7 @@ Responsibilities:
 - avoid unrelated refactors
 - document important decisions
 
-### 10.3 Review Agent
+### 12.3 Review Agent
 
 Critiques the implementation.
 
@@ -545,7 +595,7 @@ Responsibilities:
 
 The review agent must not be the same agent that implemented the code.
 
-### 10.4 Validation Agent
+### 12.4 Validation Agent
 
 Runs checks and reports results.
 
@@ -558,7 +608,7 @@ Responsibilities:
 - inspect failures
 - summarize validation status
 
-### 10.5 Refactor Agent
+### 12.5 Refactor Agent
 
 Improves structure after functionality is working.
 
@@ -570,7 +620,7 @@ Responsibilities:
 - simplify implementation
 - preserve behavior
 
-### 10.6 ÆLLI Escalation Advisor
+### 12.6 ÆLLI Escalation Advisor
 
 Used when the system needs stronger reasoning.
 
@@ -584,7 +634,7 @@ Responsibilities:
 
 ---
 
-## 11. Standard Workflow
+## 13. Standard Workflow
 
 A normal Octowiz task should follow this flow:
 
@@ -605,43 +655,128 @@ A normal Octowiz task should follow this flow:
 
 ---
 
-## 12. Quality Doctrine
+## 14. Multiplayer Steering Doctrine
+
+The target collaboration model is a shared Vibecoding room, not isolated local solo sessions connected only through GitHub pull requests.
+
+The core room model is:
+
+```text
+Janis + Bo
+inside one shared Zellij-powered Vibecoding session
+with OpenCode as the coding runtime
+with Octowiz orchestrating workflow, skills, memory, roles, and doctrine
+with ÆLLI available for escalation
+with Dennis primarily advising and reviewing, and optionally coding when invited into that role
+```
+
+Focus:
+
+```text
+Code quality > UX magic
+```
+
+However, the system must still feel like a shared remote coding room. Zellij should provide the multiplayer session layer. OpenCode should provide the coding runtime. Octowiz should provide the workflow, room ledger, role orchestration, skill routing, validation routing, review doctrine, and escalation logic.
+
+Developers must be able to steer early before agents start making meaningful changes. Every substantial task should support a pre-execution steering phase:
+
+```text
+1. Task intake
+2. Read-only inspection
+3. Initial plan
+4. Human steering checkpoint
+5. Agent execution
+6. Validation
+7. Review
+8. Improvement loop
+9. Merge readiness
+```
+
+Dennis' feedback must be treated as a product requirement here: developers need early steering before agents run ahead. Octowiz must avoid the pattern where agents immediately modify files after receiving a vague task.
+
+---
+
+## 15. Diagnosis Gate Doctrine
+
+Bugs, setup issues, failing tests, dependency problems, environment problems, and toolchain failures must not be fixed autonomously by default.
+
+Before Octowiz changes files, it must pass a read-only Diagnosis Gate.
+
+Required diagnosis output:
+
+```text
+Problem summary:
+Observed evidence:
+Affected files/systems:
+Likely root causes:
+Hypotheses:
+Confidence per hypothesis:
+Risk level:
+Recommended next action:
+Requires human confirmation:
+Yes/No
+```
+
+Octowiz may proceed without human confirmation only when:
+
+- confidence is high
+- blast radius is low
+- the change is local and reversible
+- no secrets, credentials, infrastructure, production, or dependency-wide changes are involved
+- the action fits existing project doctrine
+
+Octowiz must ask for human confirmation when:
+
+- confidence is medium or low
+- multiple plausible root causes exist
+- the fix touches architecture
+- the fix changes dependencies
+- the fix changes configuration
+- the fix changes build or deployment behavior
+- the fix could hide a deeper issue
+- the fix affects production or credentials
+
+The Diagnosis Gate exists to prevent helpful autonomous fixes that make the system worse.
+
+---
+
+## 16. Quality Doctrine
 
 Octowiz should enforce explicit quality doctrine.
 
 Initial doctrine rules:
 
-### 12.1 No Self-Approval
+### 16.1 No Self-Approval
 
 The implementer cannot be the final reviewer.
 
-### 12.2 Review Before Merge
+### 16.2 Review Before Merge
 
 Every meaningful change must pass review before merge.
 
-### 12.3 Validation Before PR Ready
+### 16.3 Validation Before PR Ready
 
 A task is not PR-ready until validation has run or has been explicitly waived.
 
-### 12.4 Failed Checks Must Be Explained
+### 16.4 Failed Checks Must Be Explained
 
 If tests, linting, type checks, or builds fail, the failure must be explained.
 
-### 12.5 Waivers Must Be Recorded
+### 16.5 Waivers Must Be Recorded
 
 If a check is skipped, ignored, or waived, the reason must be recorded.
 
-### 12.6 Human Override Is Allowed
+### 16.6 Human Override Is Allowed
 
 Humans can override the system, but the override should be visible in the task ledger.
 
-### 12.7 Escalate When Stuck
+### 16.7 Escalate When Stuck
 
 If local agents loop without progress, Octowiz should escalate to ÆLLI.
 
 ---
 
-## 13. GitHub Workflow
+## 17. GitHub Workflow
 
 Octowiz should integrate with GitHub as the delivery layer.
 
@@ -702,7 +837,7 @@ Decision summary:
 
 ---
 
-## 14. Room Ledger
+## 18. Room Ledger
 
 Octowiz should maintain a room ledger.
 
@@ -756,7 +891,7 @@ Example:
 
 ---
 
-## 15. MVP Scope
+## 19. MVP Scope
 
 The first MVP should stay focused.
 
@@ -795,7 +930,433 @@ Avoid building theater. Build the working tentacle first.
 
 ---
 
-## 16. Suggested Repository Structure
+## 20. Skill Integration Strategy
+
+Octowiz should not invent a generic skill catalog from scratch. The initial skill layer must be built from the concrete skill marketplace and the four approved skill families that Janis selected for Octowiz-v2.
+
+Approved skill source configuration:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "my-org": {
+      "source": "url",
+      "url": "https://llm.integrahub.de/claude-code/marketplace.json"
+    }
+  }
+}
+```
+
+This marketplace is the authoritative source for the external skills Octowiz-v2 should consider. Do not import random public GitHub skill repositories into the core architecture while this marketplace is available. Public repositories may be used for research only, not as active upstreams, unless Janis explicitly approves them later.
+
+### 20.1 Approved Initial Skill Families
+
+For the initial Octowiz-v2 repo, only these skill families should be used or integrated:
+
+```text
+1. superpowers
+2. mattpocock
+3. antfu
+4. octowiz
+```
+
+Everything else in the marketplace is out of scope for the first implementation, even if it looks useful. The system should be deliberately narrow at first. Otherwise the skill layer turns into a buffet where every agent returns with a plate full of mutually incompatible opinions.
+
+### 20.2 Role of Each Approved Skill Family
+
+#### Superpowers
+
+Superpowers is the process backbone and meta-discipline layer.
+
+Use it for:
+
+- planning before implementation
+- selecting the right skill before acting
+- checking assumptions
+- preventing agents from skipping workflow steps
+- forcing explicit reasoning checkpoints
+- breaking large work into controlled steps
+- keeping autonomous loops from becoming chaotic
+
+Superpowers should trigger early in most non-trivial Octowiz tasks. It acts as the operational discipline layer that tells the agent how to work, when to stop, when to verify, and when to use another skill.
+
+#### Matt Pocock
+
+Matt Pocock-style skills are the TypeScript quality layer.
+
+Use them for:
+
+- TypeScript correctness
+- strict type design
+- inference-friendly APIs
+- Zod/schema patterns
+- typed adapters
+- avoiding weak `any`-based implementations
+- refactoring TypeScript safely
+- framework-safe TypeScript patterns
+
+These skills should trigger whenever Octowiz works on TypeScript-heavy areas such as:
+
+```text
+packages/*
+apps/api/
+apps/web/
+agent-runtime/
+github-adapter/
+skill-runtime/
+sandbox-runtime/
+```
+
+#### antfu
+
+antfu-style skills are the frontend, tooling, monorepo, and DX doctrine layer.
+
+Use them for:
+
+- Vite/Nuxt/Vue ecosystem conventions when relevant
+- modern frontend tooling
+- package structure
+- linting and formatting discipline
+- monorepo hygiene
+- clean config design
+- developer experience
+- lightweight open-source maintainability patterns
+
+These skills should trigger when Octowiz touches frontend, tooling, package configuration, linting, formatting, build setup, or monorepo ergonomics.
+
+#### Octowiz
+
+Octowiz skills are the memory, routing, role-orchestration, room doctrine, and delivery skills for Octowiz-v2.
+
+Use them for:
+
+- Octowiz-native room orchestration
+- Zellij and OpenCode workflow control
+- sandbox operations
+- branch and PR delivery flows
+- room ledger updates
+- ÆLLI escalation packaging
+- Octowiz product doctrine
+
+Do not treat Octowiz v1 skills as an approved upstream family for the initial implementation. Older Octowiz material may be used as background research only when Janis explicitly provides or approves it, but it should not be imported as an active skill source.
+
+### 20.3 Marketplace Allowlist Policy
+
+The Octowiz-v2 skill runtime must support marketplace discovery, but the initial policy is allowlist-only.
+
+Allowed from `my-org` marketplace:
+
+```text
+superpowers
+mattpocock
+antfu
+octowiz
+```
+
+Denied by default:
+
+```text
+all other marketplace skills
+all unverified public GitHub skill repos
+all community mirrors not explicitly approved by Janis
+all skills that request host-level privileges without sandbox policy approval
+```
+
+This does not mean the other marketplace skills are bad. It means they are not part of the first Octowiz-v2 architecture. Octowiz should first prove that the four core families can be composed reliably.
+
+### 20.4 Mandatory Skill Capability Audit and Composition Design
+
+Before Octowiz imports, rebuilds, or operationalizes any skill, the first task is a capability audit. The goal is to define what Octowiz must be able to do, then map the four approved skill families to those capabilities.
+
+Do not begin by wiring skills directly into agents. Begin by auditing Octowiz itself. Otherwise the system risks becoming a prompt collage instead of a deliberate engineering runtime.
+
+The audit must answer:
+
+```text
+1. What must Octowiz be able to do as a product?
+2. Which capabilities are core for the MVP?
+3. Which capabilities belong to the sandbox/runtime layer?
+4. Which capabilities belong to Zellij/OpenCode room control?
+5. Which capabilities belong to agent planning, implementation, review, validation, and delivery?
+6. Which capabilities need TypeScript/frontend/tooling quality doctrine?
+7. Which capabilities need process discipline before action?
+8. Which capabilities need Octowiz-native product doctrine?
+9. Which capabilities require ÆLLI escalation?
+10. Which capabilities should explicitly not be automated yet?
+```
+
+The audit output should be stored in:
+
+```text
+docs/skill-capability-audit.md
+docs/skill-composition-strategy.md
+skills/registry.json
+```
+
+The audit should map each Octowiz capability to one or more approved skill families:
+
+```text
+superpowers  = process discipline, planning, verification, workflow hygiene
+mattpocock   = TypeScript correctness, type design, schema/API safety
+antfu        = frontend, tooling, monorepo, linting, formatting, DX conventions
+octowiz      = product-native room, sandbox, GitHub, validation, and ÆLLI workflows
+```
+
+The composition design must define when these skillsets combine. Example:
+
+```text
+Task: Implement typed GitHub PR adapter
+- Superpowers: force planning, assumption checks, review checkpoints
+- Matt Pocock: enforce strict TypeScript and inference-safe API design
+- Octowiz: enforce branch, PR, room-ledger, validation, and no-self-review doctrine
+```
+
+Another example:
+
+```text
+Task: Add web room status panel
+- Superpowers: require task plan and acceptance criteria before edits
+- antfu: apply frontend/tooling/DX conventions
+- Matt Pocock: enforce strict typed state and API contracts
+- Octowiz: record room status, validation results, and PR delivery workflow
+```
+
+The audit must also define conflict rules. For example, if a frontend convention suggests a shortcut but Octowiz sandbox policy or validation doctrine forbids it, Octowiz policy wins. If Matt Pocock TypeScript rules and antfu DX rules overlap, use the stricter rule unless it harms product simplicity or human instruction.
+
+This audit is a required milestone before autonomous skill composition is enabled.
+
+### 20.5 Skill Runtime Responsibilities
+
+Add a dedicated package:
+
+```text
+packages/skill-runtime/
+```
+
+The skill runtime is responsible for:
+
+- reading configured marketplaces
+- caching marketplace metadata
+- enforcing the skill allowlist
+- loading skill metadata and trigger descriptions
+- selecting skills based on task, repo, stack, role, and workflow step
+- composing multiple skills for one task
+- resolving conflicts between skills
+- attaching skill decisions to the room ledger
+- exposing selected skill context to OpenCode and agents
+- supporting rebuilt Octowiz-native skills
+- keeping skills optimized for the OpenCode-first Octowiz-v2 runtime, local Qwen agents, and ÆLLI escalation
+
+The skill runtime should treat marketplace skills as external source material and Octowiz-native skills as normalized, tested operational doctrine.
+
+### 20.6 Skill Library Layout
+
+Octowiz-v2 should include a local skill library and marketplace cache:
+
+```text
+skills/
+├── marketplace/
+│   ├── my-org.marketplace.json
+│   └── lock.json
+│
+├── upstream/
+│   ├── superpowers/
+│   ├── mattpocock/
+│   ├── antfu/
+│   └── octowiz/
+│
+├── octowiz/
+│   ├── planning/
+│   ├── implementation/
+│   ├── adversarial-review/
+│   ├── validation/
+│   ├── typescript-quality/
+│   ├── frontend-tooling/
+│   ├── sandbox-operations/
+│   ├── github-delivery/
+│   ├── skill-composition/
+│   └── aelli-escalation/
+│
+└── registry.json
+```
+
+The `marketplace/` directory stores the external marketplace index and lock metadata. The `upstream/` directory stores imported source material from the four approved skill families. The `octowiz/` directory stores rebuilt Octowiz-native skills. The `registry.json` file maps skills to triggers, roles, stacks, priorities, and source lineage.
+
+### 20.7 Skill Registry Example
+
+Initial `skills/registry.json` should follow this shape:
+
+```json
+{
+  "marketplaces": {
+    "my-org": {
+      "source": "url",
+      "url": "https://llm.integrahub.de/claude-code/marketplace.json",
+      "enabled": true
+    }
+  },
+  "allowlist": [
+    "superpowers:*",
+    "mattpocock:*",
+    "antfu:*",
+    "octowiz:*"
+  ],
+  "deny_by_default": true,
+  "policy": {
+    "unlisted_marketplace_skills": "deny",
+    "unverified_github_repos": "deny",
+    "host_privilege_requests": "require_sandbox_policy_approval"
+  }
+}
+```
+
+### 20.8 Skill Triggering Model
+
+Skills should be triggered through metadata and context, not by manually asking agents to remember everything.
+
+Trigger inputs:
+
+- task type
+- repository language and framework
+- current agent role
+- active workflow step
+- file paths being edited
+- validation failures
+- review findings
+- room policy
+- human steering commands
+- sandbox permission level
+
+Example:
+
+```json
+{
+  "task": "Implement GitHub adapter with typed PR summary output",
+  "repo_stack": ["typescript", "node", "github"],
+  "room_mode": "implementation",
+  "agent_role": "implementation",
+  "selected_skills": [
+    "superpowers:planning-discipline",
+    "mattpocock:typescript-quality",
+    "octowiz:github-delivery",
+    "octowiz:room-ledger"
+  ]
+}
+```
+
+### 20.9 Skill Composition Rules
+
+Octowiz must support skill composition because a real task rarely needs only one skill.
+
+Example composition:
+
+```text
+Superpowers process discipline
++ Matt Pocock TypeScript quality
++ Octowiz GitHub workflow
++ Octowiz validation
++ Octowiz room-ledger
+```
+
+Another example:
+
+```text
+Superpowers planning
++ antfu tooling doctrine
++ Matt Pocock TypeScript quality
++ Octowiz sandbox operations
+```
+
+Conflict resolution priority:
+
+```text
+1. Safety and sandbox policy
+2. Human instruction
+3. Octowiz project doctrine
+4. Superpowers process discipline
+5. Matt Pocock TypeScript quality
+6. antfu tooling/frontend doctrine
+7. Agent default behavior
+```
+
+A skill may strengthen quality requirements, but it must not bypass sandbox policy, human instructions, no-self-review rules, or validation requirements.
+
+### 20.10 Building Octowiz-Native Skills
+
+Octowiz-v2 should build Octowiz-native skills from the product requirements and capability audit, not by blindly importing older Octowiz v1 material.
+
+Build steps:
+
+```text
+1. Complete the Octowiz capability audit.
+2. Identify which capabilities are not covered by Superpowers, Matt Pocock, or antfu.
+3. Define Octowiz-native skills for room orchestration, sandbox operations, validation, GitHub delivery, room ledger updates, and ÆLLI escalation.
+4. Keep each Octowiz-native skill small, triggerable, and testable.
+5. Add explicit metadata triggers for role, stack, room mode, and workflow step.
+6. Test each skill against representative Octowiz tasks.
+7. Record skill usage and source lineage in the room ledger.
+```
+
+Older Octowiz v1 material is not an approved active upstream for the initial implementation. It may only be used later as research material if Janis explicitly approves it. The initial Octowiz skill layer should be rebuilt cleanly around the v2 architecture.
+
+### 20.11 Skill Usage in the Room Ledger
+
+Every room should record which skills were active and where they came from.
+
+Example:
+
+```json
+{
+  "room_id": "room_042",
+  "task_id": "task_042",
+  "active_skills": [
+    "superpowers:planning-discipline",
+    "mattpocock:typescript-quality",
+    "octowiz:adversarial-review",
+    "octowiz:validation"
+  ],
+  "skill_sources": {
+    "superpowers:planning-discipline": "my-org marketplace",
+    "mattpocock:typescript-quality": "my-org marketplace",
+    "octowiz:validation": "octowiz-native"
+  },
+  "skill_decisions": [
+    {
+      "skill": "mattpocock:typescript-quality",
+      "reason": "TypeScript adapter implementation detected",
+      "applied_to": ["packages/github-adapter/src/create-pr.ts"]
+    }
+  ]
+}
+```
+
+This makes the system auditable. If an agent makes a decision because a skill instructed it to, the room ledger should show that.
+
+### 20.12 MVP Skill Scope
+
+The MVP should not import every possible marketplace skill.
+
+Initial MVP skill scope:
+
+```text
+1. Configure the `my-org` marketplace.
+2. Fetch and cache marketplace metadata.
+3. Enforce allowlist-only skill discovery.
+4. Complete `docs/skill-capability-audit.md`.
+5. Complete `docs/skill-composition-strategy.md`.
+6. Import or rebuild Superpowers workflow discipline skills.
+7. Import or rebuild Matt Pocock TypeScript quality skills.
+8. Import or rebuild antfu tooling/frontend skills.
+9. Build Octowiz-native skills from the capability audit and v2 product doctrine.
+10. Implement a minimal skill registry and trigger matcher.
+11. Record active skills and source lineage in the room ledger.
+```
+
+No additional skill families should be added until these four are working together reliably.
+
+---
+
+## 21. Suggested Repository Structure
 
 Initial repository structure:
 
@@ -808,6 +1369,8 @@ octowiz-v2/
 │   ├── doctrine.md
 │   ├── room-ledger.md
 │   ├── sandbox.md
+│   ├── skills.md
+│   ├── skill-sources.md
 │   ├── mvp.md
 │   └── workflows.md
 │
@@ -822,10 +1385,29 @@ octowiz-v2/
 │   ├── github-adapter/
 │   ├── aelli-adapter/
 │   ├── agent-runtime/
+│   ├── skill-runtime/
 │   ├── sandbox-runtime/
 │   ├── doctrine/
 │   ├── room-ledger/
 │   └── validation/
+│
+├── skills/
+│   ├── upstream/
+│   │   ├── superpowers/
+│   │   ├── mattpocock/
+│   │   ├── antfu/
+│   │   └── octowiz/
+│   ├── octowiz/
+│   │   ├── planning/
+│   │   ├── implementation/
+│   │   ├── adversarial-review/
+│   │   ├── validation/
+│   │   ├── typescript-quality/
+│   │   ├── frontend-tooling/
+│   │   ├── sandbox-operations/
+│   │   ├── github-delivery/
+│   │   └── aelli-escalation/
+│   └── registry.json
 │
 ├── examples/
 │   ├── room-ledger.example.json
@@ -839,7 +1421,7 @@ octowiz-v2/
 
 ---
 
-## 17. Package Responsibilities
+## 22. Package Responsibilities
 
 ### `zellij-adapter`
 
@@ -889,6 +1471,30 @@ Responsible for:
 - supporting API-based stronger models
 - assigning roles
 - tracking agent output
+
+### `skill-runtime`
+
+Responsible for:
+
+- discovering and loading available skills
+- importing external skill packs such as Superpowers, Matt Pocock-style TypeScript skills, antfu-style tooling skills, and Octowiz-native skills
+- rebuilding approved external skill patterns into Octowiz-native operational doctrine
+- selecting skills based on task type, repo stack, agent role, workflow step, file paths, validation failures, and room policy
+- composing multiple skills for a single task
+- resolving conflicts according to Octowiz doctrine and sandbox policy
+- exposing selected skill instructions to OpenCode, agents, and AELLI escalation
+- recording active skills and skill decisions in the room ledger
+
+Initial files:
+
+```text
+skill-registry.ts
+skill-loader.ts
+skill-trigger-matcher.ts
+skill-composer.ts
+skill-conflict-resolver.ts
+skill-ledger-recorder.ts
+```
 
 ### `sandbox-runtime`
 
@@ -955,7 +1561,7 @@ Responsible for:
 
 ---
 
-## 18. Technical Direction
+## 23. Technical Direction
 
 The system should likely begin as a pragmatic local-first developer tool.
 
@@ -985,7 +1591,7 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 
 ---
 
-## 19. Possible First Milestones
+## 24. Possible First Milestones
 
 ### Milestone 1: Repo Foundation
 
@@ -995,8 +1601,25 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 - Add initial architecture docs
 - Define room ledger schema
 - Define doctrine rules
+- Add skill source inventory for Superpowers, Matt Pocock-style skills, antfu-style skills, and Octowiz-native skills
+- Add initial `skills/registry.json`
+- Document that Octowiz-v2 is OpenCode-first and not Claude Code compatible
+- Document human collaboration roles for Janis, Bo, and Dennis
 
-### Milestone 2: Sandbox Runtime Foundation
+### Milestone 2: Skill Capability Audit and Composition Design
+
+- Audit what Octowiz must be able to do across rooms, agents, sandboxing, validation, GitHub delivery, and ÆLLI escalation
+- Create `docs/skill-capability-audit.md`
+- Create `docs/skill-composition-strategy.md`
+- Map required capabilities to the four approved skill families: Superpowers, Matt Pocock, antfu, and Octowiz
+- Define which skill family triggers for each workflow step, agent role, file type, and tech-stack area
+- Define conflict-resolution rules between process discipline, TypeScript quality, frontend/tooling doctrine, and Octowiz product doctrine
+- Define which capabilities remain human-gated or ÆLLI-escalated
+- Define when Diagnosis Gate blocks autonomous fixes
+- Define early steering checkpoints before agent execution
+- Produce the first `skills/registry.json` based on the audit
+
+### Milestone 3: Sandbox Runtime Foundation
 
 - Add `packages/sandbox-runtime`
 - Define `SandboxProvider` interface
@@ -1007,21 +1630,21 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 - Deny privileged mode by default
 - Add artifact/log collection concept
 
-### Milestone 3: Manual Room Creation
+### Milestone 4: Manual Room Creation
 
 - Add script to create Zellij session
 - Add script to start OpenCode in session
 - Add simple room ledger file
 - Add manual task file format
 
-### Milestone 4: Agent Role Prototype
+### Milestone 5: Agent Role Prototype
 
 - Add implementation agent runner
 - Add review agent runner
 - Add validation runner
 - Enforce no self-review in metadata
 
-### Milestone 5: GitHub Flow
+### Milestone 6: GitHub Flow
 
 - Create branch from task
 - Commit changes
@@ -1029,14 +1652,14 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 - Attach validation summary
 - Attach review summary
 
-### Milestone 6: ÆLLI Escalation
+### Milestone 7: ÆLLI Escalation
 
 - Add manual escalation command
 - Send room/task context to ÆLLI
 - Store recommendation in room ledger
 - Allow recommendation to influence next action
 
-### Milestone 7: Multiplayer Web Entry
+### Milestone 8: Multiplayer Web Entry
 
 - Provide browser-accessible room/session entry
 - Support joining an active room
@@ -1045,7 +1668,7 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 
 ---
 
-## 20. Example Task Flow
+## 25. Example Task Flow
 
 Example task:
 
@@ -1060,19 +1683,21 @@ Flow:
 2. Octowiz creates room `room_001`.
 3. Zellij session `octowiz-room-001` starts.
 4. OpenCode starts inside the session.
-5. Planner agent creates implementation plan.
-6. Implementation agent writes session manager.
-7. Validation agent runs tests.
-8. Review agent critiques code.
-9. Implementation agent fixes issues.
-10. Review agent confirms.
-11. Octowiz prepares GitHub PR.
-12. Human approves final merge.
+5. Planner agent performs read-only inspection.
+6. Planner agent creates implementation plan.
+7. Human steering checkpoint confirms direction.
+8. Implementation agent writes session manager.
+9. Validation agent runs tests.
+10. Review agent critiques code.
+11. Implementation agent fixes issues only within approved scope.
+12. Review agent confirms.
+13. Octowiz prepares GitHub PR.
+14. Human approves final merge.
 ```
 
 ---
 
-## 21. Product Differentiation
+## 26. Product Differentiation
 
 Octowiz is differentiated by the combination of:
 
@@ -1094,7 +1719,7 @@ It should position itself as:
 
 ---
 
-## 22. Long-Term Vision
+## 27. Long-Term Vision
 
 In the long term, Octowiz should support:
 
@@ -1116,7 +1741,7 @@ Eventually, Octowiz should become the default coding execution layer for ÆLLI-p
 
 ---
 
-## 23. North Star
+## 28. North Star
 
 The north star for Octowiz:
 
