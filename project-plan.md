@@ -46,21 +46,29 @@ Octowiz exists to make that possible.
 
 ### ÆLLI
 
-ÆLLI is the top-level intelligence and main brain of the framework. Repo-based, ÆLLI is the A2A control plane for routing, memory, engineering knowledge, multi-model orchestration, and escalation.
+ÆLLI is the central, trusted intelligence of the framework: the digital Ally, steering layer, and thinking layer behind the system.
+
+The meaning of the name is intentionally layered:
+
+```text
+ÆLLI = ALLY = ELLI = AI, when the "LL" is removed.
+```
+
+That positioning matters: ÆLLI is not merely a repo, a chatbot persona, a single agent, or a narrow A2A control plane. ÆLLI is the brain of the larger Kraken framework: the intelligence that understands the goal, evaluates context, prioritizes, decides, delegates, and coordinates specialized execution layers.
 
 ÆLLI is responsible for:
 
-- A2A routing and agent-card based skill dispatch
-- memory and engineering knowledge integration
-- multi-model orchestration through LiteLLM/model routes
-- task classification and escalation routing
-- generation-review workflow control
-- preventing a generator from approving its own output
-- senior architecture, risk, and conflict escalation
-- cross-room and cross-session intelligence
-- persisting reusable project experience and playbooks
+- strategic intelligence and goal understanding
+- context interpretation across humans, data, tools, agents, and workflows
+- prioritization and decision support
+- delegation to specialized agents, tools, workflows, and product modules
+- coordination of multiple parallel tasks
+- escalation for architecture, ambiguity, risk, conflict, and failed validation
+- memory, knowledge, reusable playbooks, and project experience
+- model and agent routing where useful, including A2A-style dispatch as an implementation mechanism
+- preserving disciplined workflow separation, including no-self-review
 
-ÆLLI is not the low-level coding worker and not the shared coding UI. ÆLLI is the main brain / control plane that routes, remembers, advises, escalates, and coordinates the intelligence layer behind Octowiz.
+ÆLLI is not the low-level coding worker, not the hand that types, and not the shared coding UI. ÆLLI is the main brain: the instance that understands what should be achieved, decides which tentacles are needed, and coordinates who does what next.
 
 ### Octowiz
 
@@ -81,7 +89,7 @@ Octowiz is responsible for:
 In short:
 
 ```text
-ÆLLI = main brain / A2A control plane / routing, memory, orchestration, escalation
+ÆLLI = central intelligence / trusted Ally / strategic brain / context, decisions, delegation, orchestration, escalation
 Octowiz = coding tentacle / OpenCode-first multiplayer execution layer
 ```
 
@@ -259,7 +267,7 @@ The system should feel like a powerful engineering cockpit, not a black box.
 
 ## 8. Initial Architecture
 
-Octowiz-v2 should be a monorepo that combines the relevant parts of the existing ÆLLI and Octowiz directions into one integrated framework. This does not mean simply copying both repositories into one folder. It means designing one monorepo where ÆLLI provides the top-level intelligence/control plane and Octowiz provides the coding execution layer required by the new OpenCode/Zellij workflow.
+Octowiz-v2 should be a monorepo that combines the relevant parts of the existing ÆLLI and Octowiz directions into one integrated framework. This does not mean simply copying both repositories into one folder. It means designing one monorepo where ÆLLI remains the central intelligence and orchestration brain, while Octowiz provides the coding execution layer required by the new OpenCode/Zellij workflow.
 
 The initial architecture should combine four major layers:
 
@@ -319,7 +327,7 @@ The purpose of Octowiz-v2 is to build the new multiplayer Vibecoding architectur
 - OpenCode as the coding runtime
 - Zellij as the shared multiplayer room
 - Octowiz as the engineering workflow, memory, routing, role-orchestration, skill, and doctrine layer
-- ÆLLI as orchestration brain, senior advisor, and A2A gateway
+- ÆLLI as central intelligence, orchestration brain, senior advisor, and escalation layer
 - Qwen 35B on the Trooper GPU Server as local worker, reviewer, and fixer model
 - stronger models through ÆLLI only for escalation, architecture, risk, ambiguity, and conflict resolution
 
@@ -332,13 +340,13 @@ Octowiz-v2 should be designed as the new integrated monorepo for the combined Æ
 The monorepo should preserve a clear separation of responsibility:
 
 ```text
-ÆLLI = main brain / A2A control plane / memory / routing / model orchestration / escalation
+ÆLLI = central intelligence / trusted Ally / main brain / context, memory, decisions, delegation, orchestration, escalation
 Octowiz = coding tentacle / OpenCode-first execution layer / rooms / agents / skills / validation / delivery
 ```
 
 The purpose of combining the repos is not to blur the product concepts. It is to allow the coding workflow to work as one system:
 
-- ÆLLI provides routing, memory, model orchestration, engineering knowledge, and escalation.
+- ÆLLI provides strategic intelligence, context understanding, prioritization, delegation, memory, model/agent routing, engineering knowledge, and escalation.
 - Octowiz provides shared Zellij rooms, OpenCode execution, sandboxed room runtime, agent coordination, skill composition, validation, review loops, GitHub delivery, and Arena Mode.
 - The skill runtime, room ledger, and escalation protocol should be shared across the monorepo.
 - Existing ÆLLI capabilities may need to be adapted so their old Claude Code assumptions are replaced by OpenCode/Zellij-aware interfaces.
@@ -372,7 +380,7 @@ packages/
 
 The architectural rule is:
 
-> ÆLLI is the main brain. Octowiz is the coding tentacle. The monorepo exists so both can operate as one coherent engineering framework.
+> ÆLLI is the central intelligence and main brain. Octowiz is the coding tentacle. The monorepo exists so both can operate as one coherent engineering framework.
 
 ### 8.4 Octowiz Orchestration Layer
 
@@ -394,25 +402,25 @@ Responsibilities:
 
 Octowiz decides who does what, in which room, under which quality rules.
 
-### 8.5 ÆLLI Main Brain / Control Plane Layer
+### 8.5 ÆLLI Central Intelligence Layer
 
-ÆLLI provides the top-level intelligence of the framework. In octowiz-v2, ÆLLI should be adapted where necessary so it can operate as the main brain for the new OpenCode/Zellij-based workflow instead of remaining only tied to the older Claude Code-oriented v1 workflow.
+ÆLLI provides the top-level intelligence of the framework. In octowiz-v2, ÆLLI should be adapted where necessary so it can operate as the trusted strategic brain for the new OpenCode/Zellij-based workflow instead of being described only as a repo-bound A2A control plane or as part of the older Claude Code-oriented v1 workflow.
 
 Responsibilities:
 
-- A2A gateway and skill routing
-- model routing and multi-model orchestration
+- strategic reasoning and goal interpretation
+- context understanding across rooms, repos, humans, agents, data, and tools
+- prioritization and decision support
+- delegation to specialized tentacles, agents, workflows, and product modules
+- model routing, multi-model orchestration, and stronger-model advisor routing
 - memory, engineering knowledge, and playbook retrieval
-- cross-room awareness
-- escalation support
-- architecture guidance
-- conflict resolution
-- reasoning over failed validation
+- cross-room and cross-session awareness
+- escalation support for architecture, risk, ambiguity, conflict, and failed validation
 - senior review and risk assessment
-- advisor routing for stronger models
 - preserving no-self-review workflow separation
+- A2A gateway and skill routing where useful as implementation mechanisms
 
-ÆLLI is called when the local process, Qwen workers, skill composition, reviewers, or humans need stronger reasoning, architecture judgment, or escalation. ÆLLI should not replace Octowiz as the coding execution layer; it coordinates and empowers it.
+ÆLLI is called when the local process, Qwen workers, skill composition, reviewers, or humans need stronger reasoning, architecture judgment, prioritization, or escalation. ÆLLI should not replace Octowiz as the coding execution layer; it coordinates and empowers it.
 
 ---
 
