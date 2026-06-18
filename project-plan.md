@@ -46,12 +46,11 @@ Octowiz exists to make that possible.
 
 ### ÆLLI
 
-ÆLLI is the higher-level intelligence, orchestration brain, and A2A gateway.
+ÆLLI is the higher-level intelligence and control brain.
 
 ÆLLI is responsible for:
 
 - strategic reasoning
-- A2A orchestration and gateway routing
 - system-level architecture guidance
 - doctrine and quality principles
 - cross-room awareness
@@ -59,11 +58,11 @@ Octowiz exists to make that possible.
 - high-level decision support
 - final advisory judgment when there is uncertainty
 
-ÆLLI is not the low-level coding worker. ÆLLI is the intelligence and orchestration layer that can guide, evaluate, arbitrate, route, and escalate.
+ÆLLI is not the low-level coding worker. ÆLLI is the intelligence layer that can guide, evaluate, arbitrate, and escalate.
 
 ### Octowiz
 
-Octowiz is the coding tentacle of ÆLLI and the engineering workflow, skill, and doctrine layer for Octowiz-v2.
+Octowiz is the coding tentacle of ÆLLI.
 
 Octowiz is responsible for:
 
@@ -80,8 +79,8 @@ Octowiz is responsible for:
 In short:
 
 ```text
-ÆLLI = higher-level intelligence / orchestration brain / A2A gateway
-Octowiz = engineering workflow / skill / doctrine layer and multiplayer coding tentacle
+ÆLLI = higher-level intelligence / control brain
+Octowiz = coding layer / multiplayer engineering tentacle
 ```
 
 ---
@@ -275,7 +274,7 @@ The initial architecture should combine four major layers:
 
 ## 9. System Layers
 
-### 9.1 Zellij Multiplayer Layer
+### 8.1 Zellij Multiplayer Layer
 
 Zellij provides the multiplayer execution environment.
 
@@ -290,7 +289,7 @@ Responsibilities:
 
 Zellij is the room.
 
-### 9.2 OpenCode Layer
+### 8.2 OpenCode Layer
 
 OpenCode provides the coding cockpit.
 
@@ -305,7 +304,7 @@ Responsibilities:
 
 OpenCode is where code is actually written and modified.
 
-### 9.3 Coding Runtime Strategy
+### 8.3 Coding Runtime Strategy
 
 Octowiz-v2 is OpenCode-first.
 
@@ -322,7 +321,7 @@ The purpose of Octowiz-v2 is to build the new multiplayer Vibecoding architectur
 
 Octowiz-v2 should not spend MVP effort on Claude Code compatibility, Claude Code adapters, or migration support from Octowiz v1 unless Janis explicitly approves it later.
 
-### 9.4 Octowiz Orchestration Layer
+### 8.4 Octowiz Orchestration Layer
 
 Octowiz coordinates the coding process.
 
@@ -342,26 +341,25 @@ Responsibilities:
 
 Octowiz decides who does what, in which room, under which quality rules.
 
-### 9.5 ÆLLI Orchestration Brain and A2A Gateway
+### 8.5 ÆLLI Advisory Layer
 
-ÆLLI provides higher-level reasoning, orchestration control, and A2A gateway routing.
+ÆLLI provides higher-level reasoning and control.
 
 Responsibilities:
 
 - architecture guidance
 - doctrine management
 - escalation support
-- A2A gateway routing
 - conflict resolution
 - reasoning over failed validation
 - advice for stuck agents
 - strategic product and technical direction
 
-ÆLLI is called when the local process needs stronger reasoning, model escalation, cross-agent routing, architecture judgment, or conflict resolution.
+ÆLLI is called when the local process needs stronger reasoning.
 
 ---
 
-## 10. Sandbox Runtime
+### 8.5 Sandbox Runtime
 
 Octowiz uses a dedicated **Sandbox Runtime** as a core architecture layer.
 
@@ -476,7 +474,7 @@ The final product principle:
 
 Octowiz should support multiple room types.
 
-### 11.1 Shared Coding Room
+### 9.1 Shared Coding Room
 
 A shared coding room is used for live collaboration.
 
@@ -501,7 +499,7 @@ Use cases:
 - architectural exploration
 - human-guided implementation
 
-### 11.2 Parallel Task Room
+### 9.2 Parallel Task Room
 
 A parallel task room is used when several tasks should be worked on at the same time.
 
@@ -523,7 +521,7 @@ Each room may have its own:
 - task ledger
 - validation state
 
-### 11.3 Review Room
+### 9.3 Review Room
 
 A review room is focused only on critique and improvement.
 
@@ -536,7 +534,7 @@ Use cases:
 - refactor suggestions
 - merge readiness review
 
-### 11.4 Validation Room
+### 9.4 Validation Room
 
 A validation room is focused on running checks.
 
@@ -549,13 +547,131 @@ Use cases:
 - integration tests
 - reproducibility checks
 
+
+### 9.5 Arena Mode
+
+Arena Mode is a competitive-comparative execution mode for Octowiz.
+
+The goal is not entertainment first. The goal is better engineering outcomes through controlled competition, systematic comparison, and synthesis of the strongest parts of multiple independent solutions. The gamification layer should make the process more engaging, but code quality remains the primary objective.
+
+Arena Mode should allow Janis, Boris, and Dennis to work on the same task in parallel while customizing their agent configurations, skill composition, model settings, and steering style.
+
+Default human roles in Arena Mode:
+
+```text
+Janis = product owner, steering authority, arena participant
+Boris = active Vibecoding participant, arena participant
+Dennis = technical advisor/reviewer-first, optional active arena participant/coder
+```
+
+Arena Mode should support three competing lanes:
+
+```text
+Arena Task
+├── Lane A: Janis configuration
+├── Lane B: Boris configuration
+└── Lane C: Dennis configuration
+```
+
+Each lane may define:
+
+- agent model
+- model parameters
+- skill families and skill priorities
+- allowed tools
+- runtime constraints
+- sandbox profile
+- review strictness
+- validation strategy
+- prompting / doctrine profile
+- cost and latency limits
+
+Every lane must run in an isolated sandbox boundary and must produce comparable artifacts.
+
+Comparable artifacts should include:
+
+- implementation plan
+- code diff
+- tests added or changed
+- validation output
+- review notes
+- risk notes
+- cost / runtime metrics
+- final summary
+
+Arena Mode must support human ranking and, later, optional LLM-as-a-judge assistance. Human ranking remains authoritative for MVP.
+
+Ranking dimensions should include:
+
+- correctness
+- code quality
+- maintainability
+- architecture fit
+- type safety
+- test quality
+- minimality of change
+- risk profile
+- readability
+- developer experience
+- validation success
+- cost / latency efficiency
+
+Arena Mode should not only pick a winner. It should synthesize the best parts of all lanes into a final candidate solution.
+
+The expected arena flow is:
+
+```text
+1. Create shared arena task
+2. Define participants and lane configurations
+3. Run read-only diagnosis and planning per lane
+4. Human steering checkpoint
+5. Execute lanes in isolated sandboxes
+6. Collect diffs, tests, validation, and summaries
+7. Compare lane outputs side-by-side
+8. Rank outputs using human votes and rubric scores
+9. Extract strongest parts of each lane
+10. Create synthesis plan
+11. Generate final integrated candidate
+12. Review final candidate under normal Octowiz doctrine
+13. Record arena outcome in the room ledger
+```
+
+Arena Mode must obey the existing Octowiz doctrine:
+
+- no self-review
+- diagnosis before autonomous fixes
+- human steering before meaningful execution
+- sandbox isolation per lane
+- validation before merge readiness
+- explicit stop rules
+- ÆLLI escalation for architecture, risk, ambiguity, and conflicts
+
+Arena Mode should be designed as an internal research and quality mode first. It can later become a visible product feature with leaderboards, badges, score history, and configuration tournaments.
+
+Recommended prior-art direction:
+
+- Use Chatbot Arena / LMArena-style pairwise comparison as the ranking inspiration.
+- Use Bradley-Terry or Elo-style scoring later if enough comparisons are collected.
+- Use LLM-as-a-judge only as assistance, not as the sole decision-maker.
+- Inspect existing OSS evaluation tools before building custom ranking infrastructure.
+
+Candidate OSS components to inspect before building from scratch:
+
+- FastChat / Chatbot Arena concepts for pairwise comparison and arena UX.
+- promptfoo or similar LLM evaluation tooling for repeatable eval configuration.
+- OpenAI Evals / Inspect-style evaluation frameworks for structured eval tasks.
+- Prometheus-style open evaluator models for optional pairwise judging.
+- GitTaskBench-style repository-task evaluation ideas for code-agent task quality.
+
+Octowiz should not directly copy a generic chatbot arena. A coding arena must compare code artifacts, diffs, tests, validation results, architecture fit, and reviewer feedback. The arena substrate can be inspired by existing OSS, but the product layer must be Octowiz-native.
+
 ---
 
 ## 12. Agent Roles
 
 Octowiz should support explicit agent roles.
 
-### 12.1 Planner Agent
+### 10.1 Planner Agent
 
 Creates or refines the implementation plan.
 
@@ -567,7 +683,7 @@ Responsibilities:
 - identify risks
 - define validation requirements
 
-### 12.2 Implementation Agent
+### 10.2 Implementation Agent
 
 Writes the code.
 
@@ -580,7 +696,7 @@ Responsibilities:
 - avoid unrelated refactors
 - document important decisions
 
-### 12.3 Review Agent
+### 10.3 Review Agent
 
 Critiques the implementation.
 
@@ -595,7 +711,7 @@ Responsibilities:
 
 The review agent must not be the same agent that implemented the code.
 
-### 12.4 Validation Agent
+### 10.4 Validation Agent
 
 Runs checks and reports results.
 
@@ -608,7 +724,7 @@ Responsibilities:
 - inspect failures
 - summarize validation status
 
-### 12.5 Refactor Agent
+### 10.5 Refactor Agent
 
 Improves structure after functionality is working.
 
@@ -620,7 +736,7 @@ Responsibilities:
 - simplify implementation
 - preserve behavior
 
-### 12.6 ÆLLI Escalation Advisor
+### 10.6 ÆLLI Escalation Advisor
 
 Used when the system needs stronger reasoning.
 
@@ -746,31 +862,31 @@ Octowiz should enforce explicit quality doctrine.
 
 Initial doctrine rules:
 
-### 16.1 No Self-Approval
+### 12.1 No Self-Approval
 
 The implementer cannot be the final reviewer.
 
-### 16.2 Review Before Merge
+### 12.2 Review Before Merge
 
 Every meaningful change must pass review before merge.
 
-### 16.3 Validation Before PR Ready
+### 12.3 Validation Before PR Ready
 
 A task is not PR-ready until validation has run or has been explicitly waived.
 
-### 16.4 Failed Checks Must Be Explained
+### 12.4 Failed Checks Must Be Explained
 
 If tests, linting, type checks, or builds fail, the failure must be explained.
 
-### 16.5 Waivers Must Be Recorded
+### 12.5 Waivers Must Be Recorded
 
 If a check is skipped, ignored, or waived, the reason must be recorded.
 
-### 16.6 Human Override Is Allowed
+### 12.6 Human Override Is Allowed
 
 Humans can override the system, but the override should be visible in the task ledger.
 
-### 16.7 Escalate When Stuck
+### 12.7 Escalate When Stuck
 
 If local agents loop without progress, Octowiz should escalate to ÆLLI.
 
@@ -1386,6 +1502,7 @@ octowiz-v2/
 │   ├── aelli-adapter/
 │   ├── agent-runtime/
 │   ├── skill-runtime/
+│   ├── arena-runtime/
 │   ├── sandbox-runtime/
 │   ├── doctrine/
 │   ├── room-ledger/
@@ -1411,6 +1528,7 @@ octowiz-v2/
 │
 ├── examples/
 │   ├── room-ledger.example.json
+│   ├── arena-task.example.json
 │   └── task.example.md
 │
 └── scripts/
@@ -1494,6 +1612,34 @@ skill-trigger-matcher.ts
 skill-composer.ts
 skill-conflict-resolver.ts
 skill-ledger-recorder.ts
+```
+
+### `arena-runtime`
+
+Responsible for:
+
+- creating Arena Mode tasks
+- creating one isolated lane per participant/configuration
+- storing lane configuration, model settings, skill settings, and sandbox policy
+- launching parallel arena executions
+- collecting implementation plans, diffs, tests, validation results, review notes, and cost/runtime metrics
+- presenting side-by-side comparison artifacts
+- supporting human ranking and rubric scoring
+- supporting future pairwise ranking, Elo, or Bradley-Terry scoring
+- supporting optional LLM-as-a-judge assistance while keeping human judgment authoritative for MVP
+- generating a synthesis plan from the strongest parts of competing lane outputs
+- recording arena results, scores, winner, synthesis decisions, and final candidate status in the room ledger
+
+Initial files:
+
+```text
+arena-task.ts
+arena-lane.ts
+arena-runner.ts
+arena-artifact-collector.ts
+arena-ranking.ts
+arena-synthesis-planner.ts
+arena-ledger-recorder.ts
 ```
 
 ### `sandbox-runtime`
@@ -1618,6 +1764,23 @@ This keeps the MVP grounded and prevents early frontend complexity from slowing 
 - Define when Diagnosis Gate blocks autonomous fixes
 - Define early steering checkpoints before agent execution
 - Produce the first `skills/registry.json` based on the audit
+
+
+### Milestone 2.5: Arena Mode Research and Prototype
+
+- Research existing OSS arena/evaluation systems before building custom infrastructure
+- Decide which OSS concepts/components can be reused for Octowiz Arena Mode
+- Define `docs/arena-mode.md`
+- Define `docs/arena-ranking-rubric.md`
+- Define `examples/arena-task.example.json`
+- Add `packages/arena-runtime/`
+- Implement three-lane arena task metadata for Janis, Boris, and Dennis
+- Support custom agent/skill/model settings per lane
+- Collect lane artifacts: plan, diff, tests, validation, review, risk notes, cost, and runtime
+- Add side-by-side comparison output
+- Add human ranking and rubric scoring
+- Add synthesis plan generation from the best parts of each lane
+- Record arena results in the room ledger
 
 ### Milestone 3: Sandbox Runtime Foundation
 
