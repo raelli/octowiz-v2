@@ -73,6 +73,55 @@ describe('isMergeReady', () => {
     expect(isMergeReady(baseState(), 'nope')).toEqual({ ready: false, reasons: ['task "nope" not found'] })
   })
 
+  it('is not ready when the task is already merged', () => {
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'merged', implementerId: 'impl' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('task already merged')
+  })
+
+  it('is not ready when the task is blocked', () => {
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'blocked', implementerId: 'impl' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('task is blocked')
+  })
+
+  it('is not ready when a reviewer approves then later requests changes', () => {
+    const state = baseState()
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'changes_requested', createdAt: 't3' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
+  })
+
+  it('is ready when a reviewer requests changes then later approves', () => {
+    const state = baseState()
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'changes_requested', createdAt: 't2' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't3' })
+    expect(isMergeReady(state, 'tk1')).toEqual({ ready: true, reasons: [] })
+  })
+
+  it('is ready when one of two reviewers has a latest verdict of approved', () => {
+    const state = baseState()
+    state.participants.push({ id: 'rev2', kind: 'agent', roles: ['reviewer'], displayName: 'Rev2' })
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    // rev's latest verdict is changes_requested; rev2's latest is approved.
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'changes_requested', createdAt: 't3' })
+    state.reviews.push({ id: 'rv3', taskId: 'tk1', reviewerId: 'rev2', verdict: 'approved', createdAt: 't4' })
+    expect(isMergeReady(state, 'tk1')).toEqual({ ready: true, reasons: [] })
+  })
+
   it('is not ready when the task has no implementer', () => {
     const state = baseState()
     state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'in_review' }]
