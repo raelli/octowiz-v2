@@ -1,0 +1,10 @@
+{
+  "name": "@octowiz/config-typescript",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./base": "./base.json",
+    "./node": "./node.json",
+    "./vue-nuxt": "./vue-nuxt.json"
+  }
+}
