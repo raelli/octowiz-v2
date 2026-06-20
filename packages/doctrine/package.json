@@ -1,0 +1,20 @@
+{
+  "name": "@octowiz/doctrine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@octowiz/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "typescript": "^6.0.3"
+  }
+}

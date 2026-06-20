@@ -30,6 +30,19 @@ importers:
 
   packages/config-typescript: {}
 
+  packages/doctrine:
+    dependencies:
+      '@octowiz/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+    devDependencies:
+      '@octowiz/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/schemas:
     devDependencies:
       '@octowiz/config-typescript':
