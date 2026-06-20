@@ -4,6 +4,9 @@ packages:
   - "packages/*"
   - "skills/*"
 
+allowBuilds:
+  simple-git-hooks: true
+
 catalog:
   "@antfu/eslint-config": ^9.0.0
   eslint: ^10.5.0
@@ -18,4 +21,5 @@ catalog:
 # committed lockfile.
 minimumReleaseAge: 1440
 # Block all dependency install-time build scripts by default (empty allow-list).
-onlyBuiltDependencies: []
+onlyBuiltDependencies:
+  - simple-git-hooks
