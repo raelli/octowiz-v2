@@ -329,6 +329,10 @@ export default function octowiz(options = {}, ...userConfigs) {
   return antfu(
     {
       type: 'lib',
+      // Force TS on: antfu auto-detects via isPackageExists('typescript'), which is
+      // false at the monorepo root and would make antfu globally ignore all .ts files,
+      // silently turning the boundary rule into a no-op. Pin it true.
+      typescript: true,
       jsonc: false,
       yaml: false,
       markdown: false,
@@ -444,10 +448,16 @@ git commit -m "feat(config): add @octowiz/config-eslint with import boundaries"
 
 ```json
 {
-  "extends": "@octowiz/config-typescript/base",
+  "extends": "../config-typescript/base.json",
   "include": ["src"]
 }
 ```
+
+> Use the **relative path**, not the package specifier `@octowiz/config-typescript/base`.
+> vitest/vite-8's OXC transformer (rolldown's native `resolveTsconfig`) does not follow
+> pnpm symlinks, so the package-specifier form fails under vitest even though `tsc`
+> resolves it. The relative path works for both. This is the convention for all TS
+> packages in the workspace.
 
 - [ ] **Step 3: Install dev deps for schemas**
 
@@ -552,10 +562,13 @@ git commit -m "feat(schemas): add stub schemas package with version constant"
 
 ```json
 {
-  "extends": "@octowiz/config-typescript/base",
+  "extends": "../config-typescript/base.json",
   "include": ["src"]
 }
 ```
+
+> Relative path (not the package specifier) — see the note in Task 4 Step 2 (OXC/vitest
+> does not follow pnpm symlinks for tsconfig `extends`).
 
 - [ ] **Step 3: Install deps for doctrine (declares the schemas dependency)**
 
