@@ -66,6 +66,13 @@ octowiz-v2/
 - **Shared dev tooling** (`typescript`, `eslint`, `vitest`) is declared where it is
   imported/used rather than globally hoisted-by-accident, to keep dependency hygiene
   honest in a slice that is *about* boundaries.
+- **Lint runs as a single root pass** (`eslint .`) rather than spec §4's
+  `pnpm -r --parallel` per-package fan-out. A single flat-config root pass is the
+  antfu-idiomatic approach and lets the boundary rule see the whole tree at once;
+  `type-check` and `test` still fan out via `pnpm -r`.
+- **`mise.toml` pins `node = "lts"`** (floating to current LTS) and does not manage
+  pnpm — pnpm is pinned exactly via the `packageManager` field (corepack). Pin Node to
+  an exact version here if cross-machine reproducibility becomes important.
 
 ---
 
@@ -84,8 +91,11 @@ packages:
   - "packages/*"
   - "skills/*"
 
-# Supply-chain guardrail: block all dependency install-time build scripts by default.
-# (pnpm 11 reads settings from here, not the package.json "pnpm" field.)
+# Supply-chain guardrails. pnpm 11 reads settings from here, not the package.json
+# "pnpm" field.
+# Wait 24h before installing a newly published version (catch compromised releases).
+minimumReleaseAge: 1440
+# Block all dependency install-time build scripts by default (empty allow-list).
 onlyBuiltDependencies: []
 ```
 
