@@ -1,0 +1,23 @@
+{
+  "name": "@octowiz/config-eslint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "eslint": "*"
+  },
+  "dependencies": {
+    "@antfu/eslint-config": "catalog:"
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,21 @@
+packages:
+  - "apps/*"
+  - "layers/*"
+  - "packages/*"
+  - "skills/*"
+
+catalog:
+  "@antfu/eslint-config": ^9.0.0
+  eslint: ^10.5.0
+  typescript: ^6.0.3
+  vitest: ^4.1.9
+
+# Supply-chain guardrails. pnpm 11 reads settings from here, not the package.json
+# "pnpm" field.
+#
+# Wait 24h (1440 min) before installing a newly published version — gives a window
+# for compromised releases to be caught/yanked. Only affects new resolutions, not the
+# committed lockfile.
+minimumReleaseAge: 1440
+# Block all dependency install-time build scripts by default (empty allow-list).
+onlyBuiltDependencies: []
