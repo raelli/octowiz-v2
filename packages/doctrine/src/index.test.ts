@@ -35,13 +35,30 @@ describe('isMergeReady', () => {
     const result = isMergeReady(baseState(), 'tk1')
     expect(result.ready).toBe(false)
     expect(result.reasons).toContain('no validation recorded')
-    expect(result.reasons).toContain('no approving review from a non-implementer')
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
   })
 
   it('is not ready when only a self-approval exists', () => {
     const state = baseState()
     state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
     state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'impl', verdict: 'approved', createdAt: 't2' })
+    expect(isMergeReady(state, 'tk1').ready).toBe(false)
+  })
+
+  it('is not ready when the only approval is from a non-participant (ghost reviewer)', () => {
+    const state = baseState()
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'ghost', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
+  })
+
+  it('is not ready when the approver is a participant without the reviewer role', () => {
+    const state = baseState()
+    state.participants.push({ id: 'val', kind: 'agent', roles: ['validator'], displayName: 'Val' })
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'val', verdict: 'approved', createdAt: 't2' })
     expect(isMergeReady(state, 'tk1').ready).toBe(false)
   })
 

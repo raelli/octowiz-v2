@@ -42,11 +42,15 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
   else if (latestValidation.status !== 'passed')
     reasons.push('latest validation did not pass')
 
-  const hasIndependentApproval = state.reviews.some(
-    r => r.taskId === taskId && r.verdict === 'approved' && r.reviewerId !== task.implementerId,
+  // A qualifying approval must come from someone allowed to review this task:
+  // a participant holding the reviewer role who is not the implementer (canReview).
+  // Checking only `reviewerId !== implementerId` would let unauthorized or ghost
+  // reviewers satisfy merge-readiness, defeating the no-self-review doctrine.
+  const hasQualifiedApproval = state.reviews.some(
+    r => r.taskId === taskId && r.verdict === 'approved' && canReview(state, taskId, r.reviewerId),
   )
-  if (!hasIndependentApproval)
-    reasons.push('no approving review from a non-implementer')
+  if (!hasQualifiedApproval)
+    reasons.push('no approving review from a qualified reviewer')
 
   return { ready: reasons.length === 0, reasons }
 }
