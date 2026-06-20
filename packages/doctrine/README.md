@@ -1,7 +1,10 @@
 # @octowiz/doctrine
 
-Engineering doctrine rules (no self-review, role separation, merge-readiness, etc.).
-Currently a stub that imports `@octowiz/schemas` to prove allowed package->package
-imports resolve. Real doctrine logic lands in a later slice.
+Pure process rules over `RoomState`:
 
-Allowed imports: other `packages/*` only.
+- `canReview(state, taskId, reviewerId)` — enforces no self-review (reviewer must be a
+  participant with the reviewer role and not the task's implementer).
+- `isMergeReady(state, taskId)` — `{ ready, reasons }`; requires a passing validation
+  and an approving review from a non-implementer.
+
+Allowed imports: `@octowiz/schemas` and other `packages/*` only.
