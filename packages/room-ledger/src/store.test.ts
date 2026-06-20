@@ -40,6 +40,23 @@ describe('fileLedgerStore', () => {
     await expect(store.appendEvent('..', created)).rejects.toThrow()
   })
 
+  it('rejects empty and whitespace-only room ids', async () => {
+    const store = new FileLedgerStore(await tmpRoot())
+    await expect(store.appendEvent('', created)).rejects.toThrow()
+    await expect(store.appendEvent('   ', created)).rejects.toThrow()
+    await expect(store.readEvents('')).rejects.toThrow()
+  })
+
+  it('rejects a structurally invalid event before writing anything', async () => {
+    const root = await tmpRoot()
+    const store = new FileLedgerStore(root)
+    // A JS / untyped caller can smuggle a malformed event past the type system.
+    const malformed = { type: 'room.created', at: 't0' } as unknown as LedgerEvent
+    await expect(store.appendEvent('r1', malformed)).rejects.toThrow()
+    // Nothing was persisted — the log never came into existence.
+    expect(await store.readEvents('r1')).toEqual([])
+  })
+
   it('stamps the schema version into persisted events and rejects unsupported versions', async () => {
     const root = await tmpRoot()
     const store = new FileLedgerStore(root)

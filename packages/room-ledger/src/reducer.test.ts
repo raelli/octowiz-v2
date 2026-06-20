@@ -100,4 +100,24 @@ describe('applyEvent invariants', () => {
       { type: 'escalation.recorded', at: 't1', escalation: { id: 'e1', roomId: 'r1', taskId: 'ghost', reason: 'x', createdAt: 't1' } },
     ))).toThrow()
   })
+
+  const withTask: LedgerEvent[] = [
+    created,
+    { type: 'task.created', at: 't1', task: { id: 'tk1', roomId: 'r1', title: 'X', status: 'open' } },
+  ]
+
+  it('rejects a duplicate review id', () => {
+    const review: LedgerEvent = { type: 'review.recorded', at: 't2', review: { id: 'rv1', taskId: 'tk1', reviewerId: 'p2', verdict: 'approved', createdAt: 't2' } }
+    expect(() => applyEvents([...withTask, review, { ...review, at: 't3' }])).toThrow()
+  })
+
+  it('rejects a duplicate validation id', () => {
+    const validation: LedgerEvent = { type: 'validation.recorded', at: 't2', validation: { id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't2' } }
+    expect(() => applyEvents([...withTask, validation, { ...validation, at: 't3' }])).toThrow()
+  })
+
+  it('rejects a duplicate escalation id', () => {
+    const escalation: LedgerEvent = { type: 'escalation.recorded', at: 't2', escalation: { id: 'e1', roomId: 'r1', reason: 'x', createdAt: 't2' } }
+    expect(() => applyEvents([...withTask, escalation, { ...escalation, at: 't3' }])).toThrow()
+  })
 })

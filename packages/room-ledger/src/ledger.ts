@@ -10,6 +10,7 @@ import type {
   Validation,
 } from '@octowiz/schemas'
 import type { LedgerStore } from './store'
+import { LedgerEventSchema } from '@octowiz/schemas'
 import { applyEvents } from './reducer'
 
 /** Typed facade over a LedgerStore: build → append → project. Callers supply `at`. */
@@ -21,18 +22,23 @@ export class RoomLedger {
   }
 
   private async appendAndProject(roomId: string, event: LedgerEvent): Promise<RoomState> {
-    // Validate before persisting: replay the existing log plus the candidate in memory.
-    // applyEvents throws on any invariant violation, so a bad event is rejected *before*
-    // it is appended — otherwise it would become permanent, unreadable history.
+    // Validate before persisting. First parse the candidate structurally, then replay the
+    // existing log plus the candidate in memory: applyEvents throws on any invariant
+    // violation, so a bad event is rejected *before* it is appended — otherwise it would
+    // become permanent, unreadable history. Persist the parsed value, not the raw input.
+    const parsed = LedgerEventSchema.parse(event)
     const events = await this.store.readEvents(roomId)
-    const projected = applyEvents([...events, event])
+    const projected = applyEvents([...events, parsed])
     if (projected === null)
-      throw new Error(`room "${roomId}" has no state after applying ${event.type}`)
+      throw new Error(`room "${roomId}" has no state after applying ${parsed.type}`)
 
-    // ponytail: single-writer assumption — the read-validate-append window is not atomic
-    // across concurrent writers or processes. Add a per-room file lock / compare-and-swap
-    // if Octowiz ever writes a room's log from more than one place at once.
-    await this.store.appendEvent(roomId, event)
+    // ponytail: PRECONDITION — single writer per room. The read-validate-append window is
+    // not atomic across concurrent RoomLedger instances or processes, so two writers can
+    // both validate against the same log and append conflicting events (e.g. duplicate
+    // ids), corrupting the replay. A per-instance lock would not help the multiplayer
+    // topology (separate instances/processes). The real fix is a transactional backend:
+    // swap FileLedgerStore for the SQLite LedgerStore when concurrent writers are needed.
+    await this.store.appendEvent(roomId, parsed)
     return projected
   }
 

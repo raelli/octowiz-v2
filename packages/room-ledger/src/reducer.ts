@@ -40,16 +40,22 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
     case 'review.recorded':
       if (!hasTask(event.review.taskId))
         throw new Error(`review references unknown task "${event.review.taskId}"`)
+      if (state.reviews.some(r => r.id === event.review.id))
+        throw new Error(`duplicate review id "${event.review.id}"`)
       return { ...state, reviews: [...state.reviews, event.review] }
     case 'validation.recorded':
       if (!hasTask(event.validation.taskId))
         throw new Error(`validation references unknown task "${event.validation.taskId}"`)
+      if (state.validations.some(v => v.id === event.validation.id))
+        throw new Error(`duplicate validation id "${event.validation.id}"`)
       return { ...state, validations: [...state.validations, event.validation] }
     case 'escalation.recorded':
       if (event.escalation.roomId !== state.room.id)
         throw new Error(`escalation roomId "${event.escalation.roomId}" does not match room "${state.room.id}"`)
       if (event.escalation.taskId !== undefined && !hasTask(event.escalation.taskId))
         throw new Error(`escalation references unknown task "${event.escalation.taskId}"`)
+      if (state.escalations.some(e => e.id === event.escalation.id))
+        throw new Error(`duplicate escalation id "${event.escalation.id}"`)
       return { ...state, escalations: [...state.escalations, event.escalation] }
   }
 }

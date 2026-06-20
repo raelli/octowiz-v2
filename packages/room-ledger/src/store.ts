@@ -23,7 +23,7 @@ function isENOENT(error: unknown): boolean {
  * events / callers), so this is enforced before any path is derived.
  */
 function assertSafeRoomId(roomId: string): void {
-  if (roomId === '.' || roomId === '..' || isAbsolute(roomId) || /[/\\]/.test(roomId))
+  if (roomId.trim() === '' || roomId === '.' || roomId === '..' || isAbsolute(roomId) || /[/\\]/.test(roomId))
     throw new Error(`unsafe room id: ${JSON.stringify(roomId)}`)
 }
 
@@ -33,9 +33,13 @@ export class FileLedgerStore implements LedgerStore {
 
   async appendEvent(roomId: string, event: LedgerEvent): Promise<void> {
     assertSafeRoomId(roomId)
+    // Validate at the persistence boundary, symmetric with readEvents: parse the envelope
+    // (which validates the event and stamps the version) BEFORE touching the filesystem,
+    // and persist the parsed value. An untyped/JS caller passing a malformed event is
+    // rejected here rather than writing a line that readEvents would later reject forever.
+    const stored = StoredLedgerEventSchema.parse({ schemaVersion: SCHEMAS_VERSION, event })
     const dir = join(this.rootDir, roomId)
     await mkdir(dir, { recursive: true })
-    const stored = { schemaVersion: SCHEMAS_VERSION, event }
     await appendFile(join(dir, EVENTS_FILE), `${JSON.stringify(stored)}\n`, 'utf8')
   }
 
