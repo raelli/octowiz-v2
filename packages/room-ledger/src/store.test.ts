@@ -1,7 +1,8 @@
 import type { LedgerEvent } from '@octowiz/schemas'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { SCHEMAS_VERSION } from '@octowiz/schemas'
 import { describe, expect, it } from 'vitest'
 import { FileLedgerStore } from './store'
 
@@ -37,6 +38,17 @@ describe('fileLedgerStore', () => {
     await expect(store.readEvents('../escape')).rejects.toThrow()
     await expect(store.appendEvent('nested/room', created)).rejects.toThrow()
     await expect(store.appendEvent('..', created)).rejects.toThrow()
+  })
+
+  it('stamps the schema version into persisted events and rejects unsupported versions', async () => {
+    const root = await tmpRoot()
+    const store = new FileLedgerStore(root)
+    await store.appendEvent('r1', created)
+    const raw = await readFile(join(root, 'r1', 'events.jsonl'), 'utf8')
+    expect(JSON.parse(raw.trim()).schemaVersion).toBe(SCHEMAS_VERSION)
+
+    await writeFile(join(root, 'r1', 'events.jsonl'), `${JSON.stringify({ schemaVersion: '0.0.1', event: created })}\n`, 'utf8')
+    await expect(store.readEvents('r1')).rejects.toThrow()
   })
 
   it('throws when a stored line is corrupt', async () => {

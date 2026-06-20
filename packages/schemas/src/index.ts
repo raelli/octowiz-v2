@@ -97,6 +97,18 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 ])
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>
 
+// Persistence envelope: every stored event is stamped with the schema version it was
+// written under, so a reader can detect and reject (or later migrate) older logs at the
+// trust boundary. A version mismatch fails the `schemaVersion` literal on parse.
+//
+// ponytail: only 0.1.0 exists, so a mismatch is rejected outright. When a second version
+// ships, widen `schemaVersion` to a union and route old envelopes through a migration.
+export const StoredLedgerEventSchema = z.object({
+  schemaVersion: z.literal(SCHEMAS_VERSION),
+  event: LedgerEventSchema,
+})
+export type StoredLedgerEvent = z.infer<typeof StoredLedgerEventSchema>
+
 // Projection of the event log. `room` is always present once the log is non-empty
 // (the first event must be room.created — enforced by the room-ledger reducer).
 export const RoomStateSchema = z.object({

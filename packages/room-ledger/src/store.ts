@@ -1,7 +1,7 @@
 import type { LedgerEvent } from '@octowiz/schemas'
 import { appendFile, mkdir, readdir, readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
-import { LedgerEventSchema } from '@octowiz/schemas'
+import { SCHEMAS_VERSION, StoredLedgerEventSchema } from '@octowiz/schemas'
 
 /** Storage backend for a room's append-only event log. Backend-agnostic by design. */
 export interface LedgerStore {
@@ -35,7 +35,8 @@ export class FileLedgerStore implements LedgerStore {
     assertSafeRoomId(roomId)
     const dir = join(this.rootDir, roomId)
     await mkdir(dir, { recursive: true })
-    await appendFile(join(dir, EVENTS_FILE), `${JSON.stringify(event)}\n`, 'utf8')
+    const stored = { schemaVersion: SCHEMAS_VERSION, event }
+    await appendFile(join(dir, EVENTS_FILE), `${JSON.stringify(stored)}\n`, 'utf8')
   }
 
   async readEvents(roomId: string): Promise<LedgerEvent[]> {
@@ -50,10 +51,11 @@ export class FileLedgerStore implements LedgerStore {
       throw error
     }
     // Files are a trust boundary (hand-editable) — parse every line, don't cast.
+    // StoredLedgerEventSchema also rejects lines written under a different schema version.
     return raw
       .split('\n')
       .filter(line => line.trim() !== '')
-      .map(line => LedgerEventSchema.parse(JSON.parse(line)))
+      .map(line => StoredLedgerEventSchema.parse(JSON.parse(line)).event)
   }
 
   async listRooms(): Promise<string[]> {
