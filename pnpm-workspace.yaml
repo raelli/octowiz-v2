@@ -13,9 +13,12 @@ catalog:
 # Supply-chain guardrails. pnpm 11 reads settings from here, not the package.json
 # "pnpm" field.
 #
-# Wait 24h (1440 min) before installing a newly published version — gives a window
-# for compromised releases to be caught/yanked. Only affects new resolutions, not the
-# committed lockfile.
+# pnpm 11 ERRORS (ERR_PNPM_IGNORED_BUILDS) on any dependency install-time build
+# script that has no explicit allow/deny decision — that error is the guardrail.
+# Every build script must be vetted and recorded here.
+allowBuilds:
+  # simple-git-hooks' postinstall installs our git hooks — vetted and allowed.
+  simple-git-hooks: true
+#
+# Wait 24h before installing a newly published version (catch compromised releases).
 minimumReleaseAge: 1440
-# Block all dependency install-time build scripts by default (empty allow-list).
-onlyBuiltDependencies: []
