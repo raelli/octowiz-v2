@@ -31,6 +31,14 @@ describe('fileLedgerStore', () => {
     expect(await store.listRooms()).toContain('r1')
   })
 
+  it('rejects room ids that would escape the ledger root', async () => {
+    const store = new FileLedgerStore(await tmpRoot())
+    await expect(store.appendEvent('../escape', created)).rejects.toThrow()
+    await expect(store.readEvents('../escape')).rejects.toThrow()
+    await expect(store.appendEvent('nested/room', created)).rejects.toThrow()
+    await expect(store.appendEvent('..', created)).rejects.toThrow()
+  })
+
   it('throws when a stored line is corrupt', async () => {
     const root = await tmpRoot()
     const store = new FileLedgerStore(root)

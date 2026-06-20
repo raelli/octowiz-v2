@@ -1,6 +1,6 @@
 import type { LedgerEvent } from '@octowiz/schemas'
 import { appendFile, mkdir, readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { LedgerEventSchema } from '@octowiz/schemas'
 
 /** Storage backend for a room's append-only event log. Backend-agnostic by design. */
@@ -16,17 +16,30 @@ function isENOENT(error: unknown): boolean {
   return (error as NodeJS.ErrnoException)?.code === 'ENOENT'
 }
 
+/**
+ * A room id maps to a single directory under the ledger root, so it must be a flat,
+ * safe path segment. Reject anything that could escape the root (separators, `..`,
+ * absolute paths) — the id reaches us across a trust boundary (it comes from parsed
+ * events / callers), so this is enforced before any path is derived.
+ */
+function assertSafeRoomId(roomId: string): void {
+  if (roomId === '.' || roomId === '..' || isAbsolute(roomId) || /[/\\]/.test(roomId))
+    throw new Error(`unsafe room id: ${JSON.stringify(roomId)}`)
+}
+
 /** File-backed store: one `<rootDir>/<roomId>/events.jsonl` per room, one event per line. */
 export class FileLedgerStore implements LedgerStore {
   constructor(private readonly rootDir: string) {}
 
   async appendEvent(roomId: string, event: LedgerEvent): Promise<void> {
+    assertSafeRoomId(roomId)
     const dir = join(this.rootDir, roomId)
     await mkdir(dir, { recursive: true })
     await appendFile(join(dir, EVENTS_FILE), `${JSON.stringify(event)}\n`, 'utf8')
   }
 
   async readEvents(roomId: string): Promise<LedgerEvent[]> {
+    assertSafeRoomId(roomId)
     let raw: string
     try {
       raw = await readFile(join(this.rootDir, roomId, EVENTS_FILE), 'utf8')
