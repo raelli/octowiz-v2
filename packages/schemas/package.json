@@ -11,6 +11,9 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
     "typescript": "catalog:",
