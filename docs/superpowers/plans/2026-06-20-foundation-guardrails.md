@@ -24,7 +24,7 @@
 ```bash
 pnpm add -w -D simple-git-hooks lint-staged secretlint @secretlint/secretlint-rule-preset-recommend @commitlint/cli @commitlint/config-conventional
 ```
-Resolved versions are written live. (These tools ship prebuilt; `onlyBuiltDependencies: []` does not block them — verify install is clean with no "ignored build scripts" warning.)
+Resolved versions are written live. NOTE: `simple-git-hooks` has a `postinstall` build script. pnpm 11 ERRORS (`ERR_PNPM_IGNORED_BUILDS`) on any dependency build script without an explicit decision, so you must record it in `pnpm-workspace.yaml` under `allowBuilds:` (`simple-git-hooks: true`). That is the pnpm 11 supply-chain guardrail — no separate `onlyBuiltDependencies` entry is needed.
 
 - [ ] **Step 2: Create `.secretlintrc.json`**
 
