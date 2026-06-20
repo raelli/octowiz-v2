@@ -39,3 +39,65 @@ describe('applyEvent', () => {
     expect(applyEvents([])).toBeNull()
   })
 })
+
+describe('applyEvent invariants', () => {
+  const join = (...rest: LedgerEvent[]): LedgerEvent[] => [created, ...rest]
+
+  it('rejects a duplicate room.created', () => {
+    expect(() => applyEvents([created, created])).toThrow()
+  })
+
+  it('rejects a task whose roomId does not match the room', () => {
+    expect(() => applyEvents(join(
+      { type: 'task.created', at: 't1', task: { id: 'tk1', roomId: 'other', title: 'X', status: 'open' } },
+    ))).toThrow()
+  })
+
+  it('rejects a duplicate task id', () => {
+    const task: LedgerEvent = { type: 'task.created', at: 't1', task: { id: 'tk1', roomId: 'r1', title: 'X', status: 'open' } }
+    expect(() => applyEvents(join(task, { ...task, at: 't2' }))).toThrow()
+  })
+
+  it('rejects a duplicate participant id', () => {
+    const p: LedgerEvent = { type: 'participant.joined', at: 't1', participant: { id: 'p1', kind: 'agent', roles: [], displayName: 'P' } }
+    expect(() => applyEvents(join(p, { ...p, at: 't2' }))).toThrow()
+  })
+
+  it('rejects assigning an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'participant.joined', at: 't1', participant: { id: 'p1', kind: 'agent', roles: ['implementer'], displayName: 'P' } },
+      { type: 'task.assigned', at: 't2', taskId: 'ghost', implementerId: 'p1' },
+    ))).toThrow()
+  })
+
+  it('rejects assigning to a non-participant implementer', () => {
+    expect(() => applyEvents(join(
+      { type: 'task.created', at: 't1', task: { id: 'tk1', roomId: 'r1', title: 'X', status: 'open' } },
+      { type: 'task.assigned', at: 't2', taskId: 'tk1', implementerId: 'ghost' },
+    ))).toThrow()
+  })
+
+  it('rejects a status change for an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'task.status_changed', at: 't1', taskId: 'ghost', status: 'open' },
+    ))).toThrow()
+  })
+
+  it('rejects a review for an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'review.recorded', at: 't1', review: { id: 'rv1', taskId: 'ghost', reviewerId: 'p2', verdict: 'approved', createdAt: 't1' } },
+    ))).toThrow()
+  })
+
+  it('rejects a validation for an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'validation.recorded', at: 't1', validation: { id: 'v1', taskId: 'ghost', status: 'passed', checks: [], createdAt: 't1' } },
+    ))).toThrow()
+  })
+
+  it('rejects an escalation referencing an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'escalation.recorded', at: 't1', escalation: { id: 'e1', roomId: 'r1', taskId: 'ghost', reason: 'x', createdAt: 't1' } },
+    ))).toThrow()
+  })
+})

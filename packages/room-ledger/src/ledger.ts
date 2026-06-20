@@ -21,11 +21,19 @@ export class RoomLedger {
   }
 
   private async appendAndProject(roomId: string, event: LedgerEvent): Promise<RoomState> {
+    // Validate before persisting: replay the existing log plus the candidate in memory.
+    // applyEvents throws on any invariant violation, so a bad event is rejected *before*
+    // it is appended — otherwise it would become permanent, unreadable history.
+    const events = await this.store.readEvents(roomId)
+    const projected = applyEvents([...events, event])
+    if (projected === null)
+      throw new Error(`room "${roomId}" has no state after applying ${event.type}`)
+
+    // ponytail: single-writer assumption — the read-validate-append window is not atomic
+    // across concurrent writers or processes. Add a per-room file lock / compare-and-swap
+    // if Octowiz ever writes a room's log from more than one place at once.
     await this.store.appendEvent(roomId, event)
-    const state = await this.getState(roomId)
-    if (state === null)
-      throw new Error(`room "${roomId}" has no state after appending ${event.type}`)
-    return state
+    return projected
   }
 
   createRoom(room: Room, at: string): Promise<RoomState> {
