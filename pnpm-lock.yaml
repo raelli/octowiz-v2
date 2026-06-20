@@ -30,6 +30,18 @@ importers:
 
   packages/config-typescript: {}
 
+  packages/schemas:
+    devDependencies:
+      '@octowiz/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(vite@8.0.16(yaml@2.9.0))
+
 packages:
 
   '@antfu/eslint-config@9.0.0':
