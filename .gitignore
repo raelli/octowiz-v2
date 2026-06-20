@@ -8,3 +8,6 @@ dist/
 # Local / editor / OS
 *.local
 .DS_Store
+
+# Octowiz local tooling state (generated per workspace/session)
+.octowiz/
