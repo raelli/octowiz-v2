@@ -12,6 +12,8 @@ What product surface or capability this layer provides.
 
 ## Provides
 
+> A layer's equivalent of a package's "exported entrypoints" (per `docs/monorepo.md`).
+
 - Components / composables / pages / config this layer contributes to consuming apps.
 
 ## Ownership / domain boundary
