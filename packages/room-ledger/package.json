@@ -1,5 +1,5 @@
 {
-  "name": "@octowiz/schemas",
+  "name": "@octowiz/room-ledger",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,10 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "catalog:"
+    "@octowiz/schemas": "workspace:*"
   },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
+    "@octowiz/doctrine": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

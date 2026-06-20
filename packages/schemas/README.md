@@ -1,7 +1,10 @@
 # @octowiz/schemas
 
-Shared schemas and types for rooms, tasks, agents, validations, reviews, escalations,
-and PR metadata. Currently a stub (exports `SCHEMAS_VERSION`) that proves the workspace
-wiring; real schemas land in a later slice.
+Shared, versioned Zod schemas and inferred types for the octowiz domain: rooms,
+participants, tasks, reviews, validations, escalations, the `LedgerEvent` union, and
+the `RoomState` projection. `SCHEMAS_VERSION` is stamped into persisted data.
 
-Allowed imports: other `packages/*` only.
+Each entity is exported twice: a `…Schema` value (the Zod schema, e.g. `RoomSchema`)
+and a clean inferred type (e.g. `Room`). Parse, don't cast, at every trust boundary.
+
+Allowed imports: `zod` and other `packages/*` only.
