@@ -42,6 +42,10 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
   else if (latestValidation.status !== 'passed')
     reasons.push('latest validation did not pass')
 
+  // ponytail: a task with no implementerId can read as merge-ready once a qualified
+  // reviewer approves (canReview only excludes the implementer when one is set). Add an
+  // "unassigned task" reason here if tasks can legitimately reach review without an owner.
+  //
   // A qualifying approval must come from someone allowed to review this task:
   // a participant holding the reviewer role who is not the implementer (canReview).
   // Checking only `reviewerId !== implementerId` would let unauthorized or ghost
