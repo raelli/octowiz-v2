@@ -83,6 +83,10 @@ packages:
   - "layers/*"
   - "packages/*"
   - "skills/*"
+
+# Supply-chain guardrail: block all dependency install-time build scripts by default.
+# (pnpm 11 reads settings from here, not the package.json "pnpm" field.)
+onlyBuiltDependencies: []
 ```
 
 - [ ] **Step 2: Create root `package.json`**
@@ -98,15 +102,14 @@ packages:
     "lint:fix": "eslint . --fix",
     "type-check": "pnpm -r --parallel type-check",
     "test": "pnpm -r --parallel test"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": []
   }
 }
 ```
 
-`onlyBuiltDependencies: []` blocks all dependency install-time build scripts by default
-(supply-chain guardrail). `devDependencies` are added by later tasks via `pnpm add`.
+The supply-chain guardrail (`onlyBuiltDependencies: []`) lives in `pnpm-workspace.yaml`
+(Step 1), **not** here. pnpm 11 no longer reads a `pnpm` field from `package.json` and
+warns if one is present. `devDependencies` are added by later tasks via `pnpm add`.
+The `packageManager` field is written automatically by `corepack use` in Step 8.
 
 - [ ] **Step 3: Create `tsconfig.base.json`**
 

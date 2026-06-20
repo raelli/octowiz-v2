@@ -3,3 +3,7 @@ packages:
   - "layers/*"
   - "packages/*"
   - "skills/*"
+
+# Supply-chain guardrail: block all dependency install-time build scripts by default.
+# (pnpm 11 reads settings from here, not the package.json "pnpm" field.)
+onlyBuiltDependencies: []
