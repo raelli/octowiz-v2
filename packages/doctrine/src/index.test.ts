@@ -72,4 +72,14 @@ describe('isMergeReady', () => {
   it('reports an unknown task', () => {
     expect(isMergeReady(baseState(), 'nope')).toEqual({ ready: false, reasons: ['task "nope" not found'] })
   })
+
+  it('is not ready when the task has no implementer', () => {
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'in_review' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('task has no implementer')
+  })
 })
