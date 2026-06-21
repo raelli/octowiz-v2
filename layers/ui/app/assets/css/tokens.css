@@ -21,6 +21,10 @@
   --ow-color-task-merged: #a371f7;
   --ow-color-task-blocked: #f85149;
 
+  /* Check/validation outcome accents (room-dashboard validation panel). */
+  --ow-color-check-passed: #2ea043;
+  --ow-color-check-failed: #f85149;
+
   --ow-space-1: 0.25rem;
   --ow-space-2: 0.5rem;
   --ow-space-3: 1rem;

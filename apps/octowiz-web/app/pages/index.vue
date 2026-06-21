@@ -39,13 +39,17 @@ useHead({ title: () => state.value?.room.name ?? 'Room not found' })
       </nav>
     </template>
 
-    <!-- Main status region: M10a id line + the M10b panels, mounted additively. -->
+    <!-- Main status region: M10a id line + the M10b panels + the M10c quality/governance
+         panels, all mounted additively. -->
     <template v-if="state">
       <p class="room__id">
         Room ID: <code>{{ state.room.id }}</code>
       </p>
       <ParticipantsPanel :participants="state.participants" />
       <TaskStatePanel :tasks="state.tasks" />
+      <ValidationPanel :validations="state.validations" />
+      <ReviewPanel :reviews="state.reviews" />
+      <EscalationPanel :escalations="state.escalations" />
     </template>
     <p v-else class="error">
       Could not load room <code>{{ roomId }}</code>{{ error ? `: ${error.statusMessage}` : '' }}.
