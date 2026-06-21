@@ -1,15 +1,18 @@
 import type { RoomLedger } from '@octowiz/room-ledger'
 import type { Participant, ParticipantRole, RoomState } from '@octowiz/schemas'
+import { ParticipantRoleSchema } from '@octowiz/schemas'
+
+/** One of the assignable agent roles: every schema role except the non-agent `steward`. */
+export type AgentRole = Exclude<ParticipantRole, 'steward'>
 
 /**
- * The four assignable agent roles. A subset of `@octowiz/schemas`'
- * `ParticipantRoleSchema` (which also carries the non-agent `steward` role) — derived,
- * never redefined, so the vocabulary stays single-sourced.
+ * The assignable agent roles — derived from `@octowiz/schemas`'
+ * `ParticipantRoleSchema` by dropping the non-agent `steward` role, never redefined, so
+ * the vocabulary stays single-sourced and can't silently drift if the schema grows a role.
  */
-export const AGENT_ROLES = ['implementer', 'reviewer', 'validator', 'advisor'] as const
-
-/** One of the four roles an agent participant can be assigned. */
-export type AgentRole = (typeof AGENT_ROLES)[number]
+export const AGENT_ROLES: readonly AgentRole[] = ParticipantRoleSchema.options.filter(
+  (role): role is AgentRole => role !== 'steward',
+)
 
 function isAgentRole(role: ParticipantRole): role is AgentRole {
   return (AGENT_ROLES as readonly string[]).includes(role)

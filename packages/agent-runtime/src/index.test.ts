@@ -34,7 +34,10 @@ const baseAgent: Participant = {
 
 describe('aGENT_ROLES', () => {
   it('is exactly the four assignable agent roles', () => {
-    expect([...AGENT_ROLES]).toEqual(['implementer', 'reviewer', 'validator', 'advisor'])
+    expect([...AGENT_ROLES]).toHaveLength(4)
+    expect([...AGENT_ROLES]).toEqual(
+      expect.arrayContaining(['implementer', 'reviewer', 'validator', 'advisor']),
+    )
   })
 
   it('is consumed from the schema vocabulary, not redefined', () => {
