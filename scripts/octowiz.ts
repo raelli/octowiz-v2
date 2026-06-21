@@ -1,7 +1,7 @@
 import type { AelliClient } from '@octowiz/aelli-adapter'
 import type { AgentWorker } from '@octowiz/agent-runtime'
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
-import type { RoomState } from '@octowiz/schemas'
+import type { ReviewVerdict, RoomState } from '@octowiz/schemas'
 import type { ReadFile, WorkflowStage } from '@octowiz/skill-runtime'
 import type { Check } from '@octowiz/validation'
 import { execFile } from 'node:child_process'
@@ -9,13 +9,14 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { buildEscalationRequest, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
-import { createLocalModelWorker } from '@octowiz/agent-runtime'
+import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
 import { defaultReadFile, loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
+import { gitDiff } from './git-diff'
 
 type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
 
@@ -66,15 +67,17 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
       name: { type: 'string' },
       room: { type: 'string' },
       repo: { type: 'string' },
+      reviewer: { type: 'string' },
       task: { type: 'string' },
       title: { type: 'string' },
+      verdict: { type: 'string' },
       agent: { type: 'string' },
       stage: { type: 'string' },
     },
@@ -185,6 +188,41 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       console.log(`selected skills (${stage}): ${selected.map(s => s.id).join(', ') || '(none)'}`)
       return state
     }
+    case 'review': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const reviewerId = flag(values, 'reviewer')
+      const verdict = flag(values, 'verdict')
+      // Fail fast: registering the reviewer below would write an orphan participant.joined
+      // event before dispatchReview's reducer rejects an unknown task, and an unknown room
+      // throws a cryptic "first event must be room.created" — so verify both exist first.
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      if (!state.tasks.some(t => t.id === taskId))
+        throw new Error(`task "${taskId}" not found in room "${roomId}"`)
+      // Register the reviewer idempotently — dispatchReview's canReview gate requires a known
+      // participant holding the reviewer role. The ledger has no role-update event, so a same-id
+      // participant that isn't an agent reviewer can't be promoted: fail loudly here instead of
+      // letting canReview throw a misleading "no self-review" error.
+      const existing = state.participants.find(p => p.id === reviewerId)
+      if (existing !== undefined && (existing.kind !== 'agent' || !existing.roles.includes('reviewer')))
+        throw new Error(`cannot review task "${taskId}": participant "${reviewerId}" already exists without the agent reviewer role (the room ledger has no role-update event)`)
+      const participant = existing ?? (await ledger.addParticipant(roomId, { id: reviewerId, kind: 'agent', roles: ['reviewer'], displayName: reviewerId }, now())).participants.find(p => p.id === reviewerId)!
+      // Capture the implementer's working-tree diff as the reviewer prompt; '' when no repo given.
+      const prompt = values.repo ? await gitDiff(values.repo, run) : ''
+      return dispatchReview({
+        ledger,
+        worker,
+        roomId,
+        participant,
+        taskId,
+        prompt,
+        reviewId: `rev-${roomId}-${taskId}-${reviewerId}-${now()}`,
+        verdict: verdict as ReviewVerdict,
+        at: now(),
+      })
+    }
     case 'status': {
       const roomId = flag(values, 'room')
       const state = await ledger.getState(roomId)
@@ -200,7 +238,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | skills)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills)`)
   }
 }
 
