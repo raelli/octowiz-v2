@@ -1,3 +1,4 @@
+import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import type { RoomState } from '@octowiz/schemas'
 import { execFile } from 'node:child_process'
 import process from 'node:process'
@@ -5,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
+import { createPodmanProvider } from '@octowiz/sandbox-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 
@@ -14,6 +16,7 @@ interface Deps {
   ledger: RoomLedger
   run: Run
   now: () => string
+  provider: SandboxProvider
 }
 
 const execFileAsync = promisify(execFile)
@@ -47,7 +50,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now } = deps
+  const { ledger, run, now, provider } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -85,6 +88,12 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const roomId = flag(values, 'room')
       const repo = flag(values, 'repo')
       const name = sessionName(roomId)
+      // Room lifecycle goes THROUGH the provider seam: create the sandbox and record it
+      // before the zellij/opencode legs. M4 stayed host-first deliberately, so the legs
+      // still launch on the host for now — wiring opencode to run inside the sandbox is a
+      // later milestone; this slice proves the lifecycle depends on the interface.
+      const sandbox = await provider.create(roomId, { workdir: repo })
+      await ledger.recordSandboxStart(roomId, sandbox.provider, sandbox.id, now())
       await ensureSession(roomId, run)
       await ledger.recordSessionStart(roomId, 'zellij', name, now())
       await runInSession(roomId, startArgs(repo, { title: `Room ${roomId}` }), run)
@@ -125,7 +134,8 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
   const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
-  runCli(argv, { ledger, run: defaultRun, now: () => new Date().toISOString() })
+  const provider = createPodmanProvider(defaultRun)
+  runCli(argv, { ledger, run: defaultRun, now: () => new Date().toISOString(), provider })
     .then((state) => {
       // `status` already printed its projection; for mutating commands, echo the room id
       // so the human has the handle for follow-up commands (status/validate/start).

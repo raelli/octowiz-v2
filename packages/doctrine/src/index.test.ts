@@ -14,6 +14,7 @@ function baseState(): RoomState {
     validations: [],
     escalations: [],
     sessions: [],
+    sandboxes: [],
   }
 }
 

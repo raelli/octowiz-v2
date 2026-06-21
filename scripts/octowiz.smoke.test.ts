@@ -22,8 +22,11 @@ it('creates a real zellij session and records both session.started events', asyn
   const root = await mkdtemp(join(tmpdir(), 'octowiz-smoke-'))
   const ledger = new RoomLedger(new FileLedgerStore(root))
   const now = () => new Date().toISOString()
+  // Fake provider: this smoke targets the real zellij leg. Exercising a real container
+  // runtime is the M5c gated smoke's job (and would need cleanup), so keep podman out here.
+  const provider = { name: 'fake', create: async (roomId: string) => ({ provider: 'fake', id: `sbx-${roomId}`, roomId }), destroy: async () => {} }
 
-  const state = await runCli(['up', '--name', 'SmokeRoom', '--repo', process.cwd()], { ledger, run: defaultRun, now })
+  const state = await runCli(['up', '--name', 'SmokeRoom', '--repo', process.cwd()], { ledger, run: defaultRun, now, provider })
   const name = sessionName(state.room.id)
   try {
     expect(state.sessions.map(s => s.tool)).toEqual(['zellij', 'opencode'])

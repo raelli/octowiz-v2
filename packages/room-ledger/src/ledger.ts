@@ -77,4 +77,8 @@ export class RoomLedger {
   recordSessionStart(roomId: string, tool: 'zellij' | 'opencode', sessionName: string, at: string): Promise<RoomState> {
     return this.appendAndProject(roomId, { type: 'session.started', at, roomId, tool, sessionName })
   }
+
+  recordSandboxStart(roomId: string, provider: string, sandboxId: string, at: string): Promise<RoomState> {
+    return this.appendAndProject(roomId, { type: 'sandbox.started', at, roomId, provider, sandboxId })
+  }
 }

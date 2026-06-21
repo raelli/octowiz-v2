@@ -198,6 +198,9 @@ importers:
       '@octowiz/room-ledger':
         specifier: workspace:*
         version: link:../packages/room-ledger
+      '@octowiz/sandbox-runtime':
+        specifier: workspace:*
+        version: link:../packages/sandbox-runtime
       '@octowiz/schemas':
         specifier: workspace:*
         version: link:../packages/schemas

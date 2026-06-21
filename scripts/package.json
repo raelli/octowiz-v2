@@ -11,6 +11,7 @@
   "dependencies": {
     "@octowiz/opencode-adapter": "workspace:*",
     "@octowiz/room-ledger": "workspace:*",
+    "@octowiz/sandbox-runtime": "workspace:*",
     "@octowiz/schemas": "workspace:*",
     "@octowiz/validation": "workspace:*",
     "@octowiz/zellij-adapter": "workspace:*",

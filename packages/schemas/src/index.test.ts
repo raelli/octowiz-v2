@@ -35,8 +35,19 @@ describe('schemas', () => {
     expect(() => LedgerEventSchema.parse(bad)).toThrow()
   })
 
-  it('accepts a RoomState with sessions', () => {
+  it('parses a sandbox.started event', () => {
+    const event = { type: 'sandbox.started', at: '2026-06-21T00:00:00Z', roomId: 'r1', provider: 'podman', sandboxId: 'abc123' }
+    expect(LedgerEventSchema.parse(event)).toEqual(event)
+  })
+
+  it('rejects sandbox.started with an empty provider', () => {
+    const bad = { type: 'sandbox.started', at: '2026-06-21T00:00:00Z', roomId: 'r1', provider: '', sandboxId: 'abc123' }
+    expect(() => LedgerEventSchema.parse(bad)).toThrow()
+  })
+
+  it('accepts a RoomState with sessions and sandboxes', () => {
     const sessions = [{ tool: 'zellij', sessionName: 'octowiz-r1', at: '2026-06-21T00:00:00Z' }]
+    const sandboxes = [{ provider: 'podman', sandboxId: 'abc123', at: '2026-06-21T00:00:00Z' }]
     const state = RoomStateSchema.parse({
       room: { id: 'r1', name: 'R', status: 'active', createdAt: '2026-06-21T00:00:00Z' },
       participants: [],
@@ -45,7 +56,9 @@ describe('schemas', () => {
       validations: [],
       escalations: [],
       sessions,
+      sandboxes,
     })
     expect(state.sessions).toEqual(sessions)
+    expect(state.sandboxes).toEqual(sandboxes)
   })
 })

@@ -95,6 +95,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('validation.recorded'), at: z.string().min(1), validation: ValidationSchema }),
   z.object({ type: z.literal('escalation.recorded'), at: z.string().min(1), escalation: EscalationSchema }),
   z.object({ type: z.literal('session.started'), at: z.string().min(1), roomId: z.string().min(1), tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1) }),
+  z.object({ type: z.literal('sandbox.started'), at: z.string().min(1), roomId: z.string().min(1), provider: z.string().min(1), sandboxId: z.string().min(1) }),
 ])
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>
 
@@ -122,5 +123,6 @@ export const RoomStateSchema = z.object({
   validations: z.array(ValidationSchema),
   escalations: z.array(EscalationSchema),
   sessions: z.array(z.object({ tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1), at: z.string().min(1) })),
+  sandboxes: z.array(z.object({ provider: z.string().min(1), sandboxId: z.string().min(1), at: z.string().min(1) })),
 })
 export type RoomState = z.infer<typeof RoomStateSchema>
