@@ -116,6 +116,18 @@ describe('assign', () => {
     const state = await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], deps)
     expect(state.participants.filter(p => p.id === 'impl-1')).toHaveLength(1)
   })
+
+  it('rejects when the existing participant is not an agent implementer', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    // Seed a same-id participant that lacks the implementer role: the guard must fail loudly
+    // rather than silently assigning to a non-implementer (the ledger has no role-update event).
+    await ledger.addParticipant(roomId, { id: 'x', kind: 'agent', roles: ['reviewer'], displayName: 'X' }, deps.now())
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    await expect(runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'x'], deps)).rejects.toThrow(/already exists without the agent implementer role/)
+  })
 })
 
 describe('validate status advance', () => {

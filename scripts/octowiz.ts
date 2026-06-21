@@ -122,9 +122,15 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const agentId = flag(values, 'agent')
       // The task.assigned reducer rejects an unknown implementer, so the participant MUST
       // exist before assignTask. Register idempotently: re-running assign for the same agent
-      // (e.g. a second task) must not duplicate the participant.
+      // (e.g. a second task) must not duplicate the participant. But the reducer only checks
+      // existence, not role — so guard role-awareness here: a same-id participant that isn't an
+      // agent implementer must fail loudly, because the ledger has no role-update event to
+      // promote it (addParticipant would just throw a confusing "duplicate participant id").
       const state = await ledger.getState(roomId)
-      if (state !== null && !state.participants.some(p => p.id === agentId))
+      const existing = state?.participants.find(p => p.id === agentId)
+      if (existing !== undefined && (existing.kind !== 'agent' || !existing.roles.includes('implementer')))
+        throw new Error(`cannot assign task "${taskId}": participant "${agentId}" already exists without the agent implementer role (the room ledger has no role-update event)`)
+      if (state !== null && existing === undefined)
         await ledger.addParticipant(roomId, { id: agentId, kind: 'agent', roles: ['implementer'], displayName: agentId }, now())
       await ledger.assignTask(roomId, taskId, agentId, now())
       return ledger.setTaskStatus(roomId, taskId, 'in_progress', now())
