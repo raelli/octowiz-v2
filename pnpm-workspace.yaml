@@ -8,10 +8,16 @@ packages:
 catalog:
   "@antfu/eslint-config": ^9.0.0
   "@types/node": ^22.0.0
+  "@vitejs/plugin-vue": ^6.0.7
+  "@vue/test-utils": ^2.4.11
   eslint: ^10.5.0
+  happy-dom: ^20.10.5
+  nuxt: ^4.4.8
   tsx: ^4.0.0
   typescript: ^6.0.3
   vitest: ^4.1.9
+  vue: ^3.5.38
+  vue-tsc: ^3.3.5
   zod: ^4.4.0
 
 # Supply-chain guardrails. pnpm 11 reads settings from here, not the package.json
@@ -27,6 +33,11 @@ allowBuilds:
   # vetted and allowed. tsx runs scripts/octowiz.ts since the workspace uses extensionless
   # TS imports that node's ESM resolver can't load directly.
   esbuild: true
+  # @parcel/watcher (Nuxt/Nitro dev file-watcher) ships a native binding whose install
+  # script downloads/compiles a prebuild. Only the dev server's HMR uses it; `nuxt build`,
+  # type-check, and tests do not. Denied — its build script is skipped and the watcher
+  # falls back to polling in dev. Flip to true if native watching is wanted locally.
+  '@parcel/watcher': false
 #
 # Wait 24h before installing a newly published version (catch compromised releases).
 minimumReleaseAge: 1440

@@ -5,6 +5,13 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Nuxt generated (per-app build artifacts and dev caches)
+.nuxt/
+.output/
+.data/
+.nitro/
+.cache/
+
 # Local / editor / OS
 *.local
 .DS_Store

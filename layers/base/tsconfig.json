@@ -1,0 +1,4 @@
+{
+  "extends": "../../packages/config-typescript/vue-nuxt.json",
+  "include": ["nuxt.config.ts"]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@octowiz/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "type-check": "nuxt prepare && vue-tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@octowiz/layer-base": "workspace:*",
+    "@octowiz/layer-ui": "workspace:*",
+    "@octowiz/room-ledger": "workspace:*",
+    "@octowiz/schemas": "workspace:*",
+    "nuxt": "catalog:",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vue/test-utils": "catalog:",
+    "happy-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}
