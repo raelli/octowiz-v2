@@ -12,11 +12,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@octowiz/doctrine": "workspace:*",
-    "@octowiz/schemas": "workspace:*"
+    "@octowiz/doctrine": "workspace:*"
   },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
+    "@octowiz/schemas": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

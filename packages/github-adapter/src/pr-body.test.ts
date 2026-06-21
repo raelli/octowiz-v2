@@ -124,7 +124,10 @@ describe('generatePullRequestBody', () => {
   describe('merge readiness', () => {
     it('renders ready when isMergeReady is satisfied', () => {
       const body = generatePullRequestBody(readyState(), 'tk1')
-      expect(body).toMatch(/ready/i)
+      // Assert the literal ready heading and that the not-ready heading is absent,
+      // so a broken impl rendering "Not ready" cannot pass a loose /ready/i match.
+      expect(body).toContain('✅ **Ready to merge.**')
+      expect(body).not.toContain('Not ready')
       // No unmet-reason lines should appear.
       expect(body).not.toContain('no approving review from a qualified reviewer')
     })

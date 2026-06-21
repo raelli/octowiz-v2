@@ -131,13 +131,13 @@ importers:
       '@octowiz/doctrine':
         specifier: workspace:*
         version: link:../doctrine
-      '@octowiz/schemas':
-        specifier: workspace:*
-        version: link:../schemas
     devDependencies:
       '@octowiz/config-typescript':
         specifier: workspace:*
         version: link:../config-typescript
+      '@octowiz/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.21
