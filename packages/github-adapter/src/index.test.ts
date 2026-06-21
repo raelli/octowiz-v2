@@ -15,10 +15,23 @@ describe('createBranch', () => {
     expect(pushCall![1]).toEqual(['push', '-u', 'origin', 'feat/x'])
   })
 
-  it('throws with stderr when the branch cannot be created', async () => {
-    const run = vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'already exists' })
-    await expect(createBranch('feat/x', run)).rejects.toThrow(/already exists/)
-    expect(run).toHaveBeenCalledTimes(1) // does not push after a failed switch
+  it('throws with stderr when switch -c fails for a non-existence reason', async () => {
+    const run = vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'fatal: invalid reference' })
+    await expect(createBranch('feat/x', run)).rejects.toThrow(/invalid reference/)
+    expect(run).toHaveBeenCalledTimes(1) // does not fall back or push after a genuine failure
+  })
+
+  it('reuses an existing branch then pushes when switch -c reports it already exists', async () => {
+    const run = vi.fn()
+      .mockResolvedValueOnce({ code: 128, stdout: '', stderr: 'fatal: a branch named \'feat/x\' already exists' })
+      .mockResolvedValueOnce(ok) // git switch feat/x
+      .mockResolvedValueOnce(ok) // git push -u origin feat/x
+    await expect(createBranch('feat/x', run)).resolves.toBeUndefined()
+    expect(run).toHaveBeenCalledTimes(3)
+    const [switchCreateCall, switchCall, pushCall] = run.mock.calls
+    expect(switchCreateCall![1]).toEqual(['switch', '-c', 'feat/x'])
+    expect(switchCall![1]).toEqual(['switch', 'feat/x'])
+    expect(pushCall![1]).toEqual(['push', '-u', 'origin', 'feat/x'])
   })
 
   it('throws with stderr when the push fails', async () => {
