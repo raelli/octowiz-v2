@@ -1,3 +1,4 @@
+import type { RoomLedger } from '@octowiz/room-ledger'
 import type { Review, Room, RoomState, Task, Validation } from '@octowiz/schemas'
 
 export interface EscalationDecision {
@@ -89,4 +90,48 @@ export function buildEscalationRequest(state: RoomState, taskId: string): AelliE
     validations: state.validations.filter(v => v.taskId === taskId),
     reason: shouldEscalate(state, taskId).reason,
   }
+}
+
+/**
+ * The ÆLLI seam: an injected async function that takes an escalation request payload and
+ * returns ÆLLI's recommendation as a string. This is the only coupling to ÆLLI — the real
+ * client (HTTP, queue, whatever) lives outside M9 and is faked in tests. Keeping it a bare
+ * function makes the whole flow unit-testable with no network.
+ */
+export type AelliClient = (request: AelliEscalationRequest) => Promise<string>
+
+/**
+ * The output half of the escalation flow: ask ÆLLI through the injected seam, then record its
+ * recommendation — alongside the triggering reason and the task it concerns — into the room's
+ * append-only ledger as an `escalation.recorded` event. Returns the projected `RoomState`, so
+ * the new escalation (with recommendation) is immediately observable.
+ *
+ * `id` and `at` are caller-supplied, matching the rest of the ledger API — time and ids stay
+ * out of this core so it is deterministic and testable.
+ *
+ * Fails closed:
+ * - A request with no `reason` means no trigger fired; recording an escalation would be a
+ *   caller bug, so throw before touching ÆLLI or the ledger (mirrors `buildEscalationRequest`).
+ * - If the seam rejects, the rejection propagates and nothing is recorded — the ledger is only
+ *   written after ÆLLI answers. No swallowing: a lost recommendation must not look like success.
+ */
+export async function recordAelliEscalation(
+  ledger: RoomLedger,
+  askAelli: AelliClient,
+  request: AelliEscalationRequest,
+  { id, at }: { id: string, at: string },
+): Promise<RoomState> {
+  if (request.reason === undefined)
+    throw new Error('cannot record an escalation without a reason — no trigger fired')
+
+  const recommendation = await askAelli(request)
+
+  return ledger.recordEscalation(request.room.id, {
+    id,
+    roomId: request.room.id,
+    taskId: request.task.id,
+    reason: request.reason,
+    recommendation,
+    createdAt: at,
+  }, at)
 }
