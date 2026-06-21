@@ -12,10 +12,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@octowiz/room-ledger": "workspace:*",
     "@octowiz/schemas": "workspace:*"
   },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
