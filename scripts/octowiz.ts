@@ -126,11 +126,18 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       // existence, not role — so guard role-awareness here: a same-id participant that isn't an
       // agent implementer must fail loudly, because the ledger has no role-update event to
       // promote it (addParticipant would just throw a confusing "duplicate participant id").
+      // Fail fast: assignTask would write an orphan participant.joined event before its
+      // reducer rejects an unknown task, and an unknown room throws a cryptic "first event
+      // must be room.created" — so verify the room and task exist first.
       const state = await ledger.getState(roomId)
-      const existing = state?.participants.find(p => p.id === agentId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      if (!state.tasks.some(t => t.id === taskId))
+        throw new Error(`task "${taskId}" not found in room "${roomId}"`)
+      const existing = state.participants.find(p => p.id === agentId)
       if (existing !== undefined && (existing.kind !== 'agent' || !existing.roles.includes('implementer')))
         throw new Error(`cannot assign task "${taskId}": participant "${agentId}" already exists without the agent implementer role (the room ledger has no role-update event)`)
-      if (state !== null && existing === undefined)
+      if (existing === undefined)
         await ledger.addParticipant(roomId, { id: agentId, kind: 'agent', roles: ['implementer'], displayName: agentId }, now())
       await ledger.assignTask(roomId, taskId, agentId, now())
       return ledger.setTaskStatus(roomId, taskId, 'in_progress', now())

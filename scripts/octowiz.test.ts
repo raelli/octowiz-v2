@@ -128,6 +128,20 @@ describe('assign', () => {
     const taskId = withTask.tasks[0]!.id
     await expect(runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'x'], deps)).rejects.toThrow(/already exists without the agent implementer role/)
   })
+
+  it('fails fast on an unknown task without writing an orphan participant', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    await expect(runCli(['assign', '--room', roomId, '--task', 'ghost', '--agent', 'impl-1'], deps)).rejects.toThrow(/not found/)
+    const after = await ledger.getState(roomId)
+    expect(after?.participants.some(p => p.id === 'impl-1')).toBe(false)
+  })
+
+  it('fails fast on an unknown room', async () => {
+    const { deps } = await fixture()
+    await expect(runCli(['assign', '--room', 'no-room', '--task', 't', '--agent', 'impl-1'], deps)).rejects.toThrow(/room "no-room" not found/)
+  })
 })
 
 describe('validate status advance', () => {
