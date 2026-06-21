@@ -1,6 +1,6 @@
 import type { Run } from './index'
 import { describe, expect, it } from 'vitest'
-import { createPodmanProvider, sandboxName } from './index'
+import { createDockerProvider, createPodmanProvider, sandboxName, selectProvider } from './index'
 
 // A fake Run records invocations and returns a scripted result, so the provider is
 // exercised with no real container runtime. `firstCall` narrows away `undefined`.
@@ -88,5 +88,33 @@ describe('podman provider', () => {
   it('destroy throws on a non-zero exit', async () => {
     const { run } = fakeRun({ code: 1, stderr: 'not found' })
     await expect(createPodmanProvider(run).destroy({ provider: 'podman', id: 'x', roomId: 'r1' })).rejects.toThrow()
+  })
+})
+
+// docker shares the implementation with podman (same argv); the binary name is the only
+// difference, so cover that difference rather than re-testing the shared lifecycle logic.
+describe('docker provider', () => {
+  it('shells out to docker (not podman) and tags the handle docker', async () => {
+    const { run, firstCall } = fakeRun({ code: 0, stdout: 'cid\n' })
+    const handle = await createDockerProvider(run).create('r1')
+    expect(firstCall().cmd).toBe('docker')
+    expect(firstCall().args.slice(0, 4)).toEqual(['run', '-d', '--name', 'octowiz-sbx-r1'])
+    expect(handle).toEqual({ provider: 'docker', id: 'cid', roomId: 'r1' })
+  })
+
+  it('destroy refuses a podman handle', async () => {
+    const { run } = fakeRun({ code: 0 })
+    await expect(createDockerProvider(run).destroy({ provider: 'podman', id: 'x', roomId: 'r1' })).rejects.toThrow()
+  })
+})
+
+describe('selectProvider', () => {
+  const { run } = fakeRun({ code: 0 })
+  it('returns the named provider', () => {
+    expect(selectProvider('podman', run).name).toBe('podman')
+    expect(selectProvider('docker', run).name).toBe('docker')
+  })
+  it('defaults auto to podman (MVP rootless default)', () => {
+    expect(selectProvider('auto', run).name).toBe('podman')
   })
 })
