@@ -8,11 +8,23 @@ export type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdou
  * `git switch -c` over the older `checkout -b` (git ≥ 2.23). A non-zero exit on either
  * step throws with the captured stderr, matching the adapter convention — and the push
  * is skipped if the branch could not be created.
+ *
+ * Create-or-reuse: `openPullRequestForBranch` creates+pushes the branch BEFORE
+ * `gh pr create`, so if `gh pr create` later fails (expired auth, transient network, PR
+ * already exists) the branch survives. A naive `switch -c` would then throw "already
+ * exists" on the next `deliver`, wedging the task (not merged, not re-deliverable without
+ * a manual `git branch -D`). So if `switch -c` fails *because the branch already exists*,
+ * fall back to `git switch <branch>` to reuse it; any other create failure still throws.
  */
 export async function createBranch(branch: string, run: Run): Promise<void> {
   const created = await run('git', ['switch', '-c', branch])
-  if (created.code !== 0)
-    throw new Error(`failed to create branch ${branch}: exit ${created.code}${created.stderr ? `: ${created.stderr}` : ' (no stderr)'}`)
+  if (created.code !== 0) {
+    if (!/already exists/i.test(created.stderr))
+      throw new Error(`failed to create branch ${branch}: exit ${created.code}${created.stderr ? `: ${created.stderr}` : ' (no stderr)'}`)
+    const switched = await run('git', ['switch', branch])
+    if (switched.code !== 0)
+      throw new Error(`failed to switch to existing branch ${branch}: exit ${switched.code}${switched.stderr ? `: ${switched.stderr}` : ' (no stderr)'}`)
+  }
   const pushed = await run('git', ['push', '-u', 'origin', branch])
   if (pushed.code !== 0)
     throw new Error(`failed to push branch ${branch}: exit ${pushed.code}${pushed.stderr ? `: ${pushed.stderr}` : ' (no stderr)'}`)
