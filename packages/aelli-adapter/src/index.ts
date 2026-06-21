@@ -23,6 +23,10 @@ export interface EscalationDecision {
  * `changes_requested` is deliberately NOT a trigger: it is the normal review loop, not a
  * situation that warrants pulling in ÆLLI. Only a hard `rejected` blocks.
  *
+ * Any reviewer's rejection triggers; unlike `@octowiz/doctrine`'s merge-readiness, escalation
+ * does NOT require the reviewer to be qualified (`canReview`). Escalating liberally is the
+ * safe direction — over-escalating a ghost's rejection is cheap; missing a real block is not.
+ *
  * An unknown task does not escalate — there is nothing to act on. Pure: no I/O.
  */
 export function shouldEscalate(state: RoomState, taskId: string): EscalationDecision {
@@ -56,7 +60,6 @@ export function shouldEscalate(state: RoomState, taskId: string): EscalationDeci
  * the `Escalation` recorded as output (see #33, which sends it and records the result).
  */
 export interface AelliEscalationRequest {
-  roomId: string
   room: Room
   task: Task
   /** Reviews for this task only, in ledger append order. */
@@ -80,7 +83,6 @@ export function buildEscalationRequest(state: RoomState, taskId: string): AelliE
     throw new Error(`task "${taskId}" not found`)
 
   return {
-    roomId: state.room.id,
     room: state.room,
     task,
     reviews: state.reviews.filter(r => r.taskId === taskId),

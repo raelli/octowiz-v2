@@ -125,11 +125,6 @@ describe('buildEscalationRequest', () => {
     expect(payload.reason).toContain('validation')
   })
 
-  it('carries the room id on the payload for routing', () => {
-    const payload = buildEscalationRequest(baseState(), 'tk1')
-    expect(payload.roomId).toBe('r1')
-  })
-
   it('builds a payload even when no trigger fires (reason is undefined)', () => {
     const payload = buildEscalationRequest(baseState(), 'tk1')
     expect(payload.reason).toBeUndefined()
