@@ -153,6 +153,45 @@ describe('up', () => {
   })
 })
 
+describe('escalate', () => {
+  it('records an ÆLLI escalation with the stub recommendation when a review rejected the task', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // Seed the rejected-review state through the ledger directly — assign/review commands
+    // may not exist on this branch, and shouldEscalate only needs the recorded events.
+    await ledger.addParticipant(roomId, { id: 'rev', kind: 'agent', roles: ['reviewer'], displayName: 'Rev' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'rev', deps.now())
+    await ledger.recordReview(roomId, { id: 'rv1', taskId, reviewerId: 'rev', verdict: 'rejected', createdAt: deps.now() }, deps.now())
+
+    await runCli(['escalate', '--room', roomId, '--task', taskId], deps)
+
+    const after = await ledger.getState(roomId)
+    expect(after?.escalations).toHaveLength(1)
+    expect(after?.escalations[0]).toMatchObject({
+      roomId,
+      taskId,
+      reason: 'a review rejected the task',
+      recommendation: 'aelli: proceed with caution',
+    })
+  })
+
+  it('is a no-op when nothing triggers (no escalation recorded)', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+
+    await runCli(['escalate', '--room', roomId, '--task', taskId], deps)
+
+    const after = await ledger.getState(roomId)
+    expect(after?.escalations).toEqual([])
+  })
+})
+
 describe('errors', () => {
   it('throws on an unknown subcommand', async () => {
     const { deps } = await fixture()
