@@ -8,16 +8,16 @@ export interface TaskContext {
  * the CLI spawns this via zellij.runInSession; nothing here spawns a process, and this
  * package does NOT depend on zellij-adapter (the CLI composes the two).
  *
- * ponytail: passes the task as a single non-interactive `run` prompt and the repo via
- * --cwd. The exact flag/prompt mechanism (arg vs env vs prompt file) is UNVERIFIED —
- * the `opencode` binary is not installed (spec slice 3 open question). This is the one
- * place that mechanism lives; swap the construction here once verified against the
- * real binary. Tests assert behaviour (repo path + task text present), not exact flags,
- * so confirming the real form won't churn them.
+ * ponytail: passes the task as a single non-interactive `run` prompt (positional
+ * [message..]) and the repo via --dir. Confirmed against the SST opencode CLI docs
+ * (opencode.ai/docs/cli: `opencode run [message..]`, working-dir flag is `--dir`).
+ * Still UNVERIFIED against the real binary (not installed) — the OCTOWIZ_SMOKE leg
+ * closes that. This is the one place the mechanism lives; tests assert behaviour
+ * (repo path + task text present), not exact flags.
  */
 export function startArgs(repoPath: string, taskContext: TaskContext): string[] {
   const prompt = taskContext.description
     ? `${taskContext.title}\n\n${taskContext.description}`
     : taskContext.title
-  return ['opencode', 'run', '--cwd', repoPath, prompt]
+  return ['opencode', 'run', '--dir', repoPath, prompt]
 }
