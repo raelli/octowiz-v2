@@ -1,0 +1,22 @@
+{
+  "name": "@octowiz/layer-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@octowiz/schemas": "workspace:*",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "nuxt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

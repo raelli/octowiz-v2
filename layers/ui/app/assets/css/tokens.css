@@ -1,0 +1,32 @@
+/* layers/ui — design tokens.
+ *
+ * The shared visual vocabulary as CSS custom properties: one source of truth for colour,
+ * spacing, radius, and type. Components reference these vars rather than literal values. */
+:root {
+  --ow-color-bg: #0d1117;
+  --ow-color-surface: #161b22;
+  --ow-color-border: #30363d;
+  --ow-color-text: #e6edf3;
+  --ow-color-text-muted: #8b949e;
+
+  /* Status accents. */
+  --ow-color-active: #2ea043;
+  --ow-color-archived: #8b949e;
+
+  --ow-space-1: 0.25rem;
+  --ow-space-2: 0.5rem;
+  --ow-space-3: 1rem;
+  --ow-space-4: 1.5rem;
+
+  --ow-radius: 6px;
+  --ow-radius-pill: 999px;
+
+  --ow-font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--ow-color-bg);
+  color: var(--ow-color-text);
+  font-family: var(--ow-font-sans);
+}
