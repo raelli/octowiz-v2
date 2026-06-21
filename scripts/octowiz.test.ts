@@ -18,7 +18,15 @@ async function fixture() {
     create: async (roomId, _opts) => ({ provider: 'fake', id: `sbx-${roomId}`, roomId }),
     destroy: async () => {},
   }
-  const deps = { ledger, run, now, provider }
+  // Stub the new seams: hermetic, no real model/ÆLLI/registry. No command consumes them in
+  // this slice — they exist so the enlarged Deps stays satisfiable — but later slices will.
+  const worker = async ({ role }: { role: string }) => ({ text: `${role}: looks good` })
+  const aelliClient = async () => 'aelli: proceed with caution'
+  const readFile = async () => JSON.stringify({ schemaVersion: '0.1.0', skills: [] })
+  const skillRegistryPath = 'skills/registry.json'
+  // A trivial real-`pnpm`-free check so `validate` runs the injected list, not the monorepo suite.
+  const checks = [{ name: 'noop', cmd: 'true', args: [] }]
+  const deps = { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks }
   return { root, ledger, now, run, provider, deps }
 }
 

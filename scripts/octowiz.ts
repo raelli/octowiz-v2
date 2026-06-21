@@ -1,12 +1,18 @@
+import type { AelliClient } from '@octowiz/aelli-adapter'
+import type { AgentWorker } from '@octowiz/agent-runtime'
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import type { RoomState } from '@octowiz/schemas'
+import type { ReadFile } from '@octowiz/skill-runtime'
+import type { Check } from '@octowiz/validation'
 import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import { createLocalModelWorker } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
+import { defaultReadFile } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 
@@ -17,6 +23,15 @@ interface Deps {
   run: Run
   now: () => string
   provider: SandboxProvider
+  // Injected seams for the later M11 subcommand slices — wired here so the composition root
+  // can drive the runtime packages, but no command consumes them yet (this slice is the spine).
+  worker: AgentWorker
+  aelliClient: AelliClient
+  readFile: ReadFile
+  skillRegistryPath: string
+  // Injectable so tests/acceptance supply trivial real-`pnpm` checks instead of recursively
+  // running the monorepo suite; defaults to the validation package's DEFAULT_CHECKS.
+  checks: Check[]
 }
 
 const execFileAsync = promisify(execFile)
@@ -50,7 +65,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider } = deps
+  const { ledger, run, now, provider, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -107,7 +122,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const state = await ledger.getState(roomId)
       if (state === null || !state.tasks.some(t => t.id === taskId))
         throw new Error(`task "${taskId}" not found in room "${roomId}"`)
-      const validation = await runValidation(taskId, DEFAULT_CHECKS, run, now())
+      const validation = await runValidation(taskId, checks, run, now())
       return ledger.recordValidation(roomId, validation, now())
     }
     case 'status': {
@@ -135,7 +150,23 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
   const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
   const provider = selectProvider('auto', defaultRun)
-  runCli(argv, { ledger, run: defaultRun, now: () => new Date().toISOString(), provider })
+  const worker = createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
+  // The real ÆLLI client is deferred (de-faking is a separate item), so wire one that fails
+  // loudly if invoked — no command in this slice calls it, and a silent no-op would hide that.
+  const aelliClient: AelliClient = async () => {
+    throw new Error('ÆLLI client not configured (item #2)')
+  }
+  runCli(argv, {
+    ledger,
+    run: defaultRun,
+    now: () => new Date().toISOString(),
+    provider,
+    worker,
+    aelliClient,
+    readFile: defaultReadFile,
+    skillRegistryPath: 'skills/registry.json',
+    checks: DEFAULT_CHECKS,
+  })
     .then((state) => {
       // `status` already printed its projection; for mutating commands, echo the room id
       // so the human has the handle for follow-up commands (status/validate/start).
