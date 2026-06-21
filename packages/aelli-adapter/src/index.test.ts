@@ -74,8 +74,11 @@ describe('shouldEscalate', () => {
 
   it('does not escalate when a rejection was later superseded by an approval (append order)', () => {
     const state = baseState()
-    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'rejected', createdAt: 't1' })
-    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    // Invert createdAt vs append order: the superseding approval carries an EARLIER createdAt
+    // than the rejection it follows. A createdAt-based "latest" would still see the rejection
+    // and escalate; only honouring append position yields { escalate: false }.
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'rejected', createdAt: '2026-01-02T00:00:00Z' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: '2026-01-01T00:00:00Z' })
     expect(shouldEscalate(state, 'tk1')).toEqual({ escalate: false })
   })
 
@@ -86,6 +89,16 @@ describe('shouldEscalate', () => {
     state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev2', verdict: 'approved', createdAt: 't2' })
     // rev's latest verdict is still a rejection; rev2 approving does not clear it.
     expect(shouldEscalate(state, 'tk1').escalate).toBe(true)
+  })
+
+  it('escalates on a rejection from a non-qualified (ghost) reviewer — escalation does not require canReview', () => {
+    const state = baseState()
+    // 'ghost' is not a participant at all, let alone a qualified reviewer. Unlike merge-readiness,
+    // escalation deliberately ignores canReview: over-escalating a ghost's rejection is cheap.
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'ghost', verdict: 'rejected', createdAt: 't1' })
+    const result = shouldEscalate(state, 'tk1')
+    expect(result.escalate).toBe(true)
+    expect(result.reason).toContain('review')
   })
 
   it('escalates when the task is blocked', () => {
