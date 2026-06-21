@@ -73,4 +73,8 @@ export class RoomLedger {
   recordEscalation(roomId: string, escalation: Escalation, at: string): Promise<RoomState> {
     return this.appendAndProject(roomId, { type: 'escalation.recorded', at, escalation })
   }
+
+  recordSessionStart(roomId: string, tool: 'zellij' | 'opencode', sessionName: string, at: string): Promise<RoomState> {
+    return this.appendAndProject(roomId, { type: 'session.started', at, roomId, tool, sessionName })
+  }
 }

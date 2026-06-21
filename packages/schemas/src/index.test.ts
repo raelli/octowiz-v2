@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LedgerEventSchema, RoomSchema, SCHEMAS_VERSION } from './index'
+import { LedgerEventSchema, RoomSchema, RoomStateSchema, SCHEMAS_VERSION } from './index'
 
 describe('schemas', () => {
   it('exposes the bumped version', () => {
@@ -23,5 +23,29 @@ describe('schemas', () => {
     })
     expect(event.type).toBe('room.created')
     expect(() => LedgerEventSchema.parse({ type: 'bogus', at: 'x' })).toThrow()
+  })
+
+  it('parses a session.started event', () => {
+    const event = { type: 'session.started', at: '2026-06-21T00:00:00Z', roomId: 'r1', tool: 'zellij', sessionName: 'octowiz-r1' }
+    expect(LedgerEventSchema.parse(event)).toEqual(event)
+  })
+
+  it('rejects session.started with an unknown tool', () => {
+    const bad = { type: 'session.started', at: '2026-06-21T00:00:00Z', roomId: 'r1', tool: 'tmux', sessionName: 'octowiz-r1' }
+    expect(() => LedgerEventSchema.parse(bad)).toThrow()
+  })
+
+  it('accepts a RoomState with sessions', () => {
+    const sessions = [{ tool: 'zellij', sessionName: 'octowiz-r1', at: '2026-06-21T00:00:00Z' }]
+    const state = RoomStateSchema.parse({
+      room: { id: 'r1', name: 'R', status: 'active', createdAt: '2026-06-21T00:00:00Z' },
+      participants: [],
+      tasks: [],
+      reviews: [],
+      validations: [],
+      escalations: [],
+      sessions,
+    })
+    expect(state.sessions).toEqual(sessions)
   })
 })
