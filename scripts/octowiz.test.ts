@@ -179,6 +179,67 @@ describe('up', () => {
   })
 })
 
+describe('review', () => {
+  it('records an approving review from a different reviewer in room state', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // Set up the implementer directly via the ledger (no `assign` command on this branch).
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+
+    const state = await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev', '--verdict', 'approved'], deps)
+
+    expect(state.participants.some(p => p.id === 'rev' && p.roles.includes('reviewer'))).toBe(true)
+    expect(state.reviews).toHaveLength(1)
+    expect(state.reviews[0]).toMatchObject({ taskId, reviewerId: 'rev', verdict: 'approved', notes: 'reviewer: looks good' })
+  })
+
+  it('refuses a self-review (reviewer is the task implementer)', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // 'imp' must hold the reviewer role to clear the role guard so canReview is the gate that
+    // refuses — it's the task's implementer, so self-review is the rejection we want to assert.
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer', 'reviewer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+
+    await expect(
+      runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'imp', '--verdict', 'approved'], deps),
+    ).rejects.toThrow(/no self-review/)
+    expect((await ledger.getState(roomId))?.reviews).toEqual([])
+  })
+
+  it('rejects when the existing reviewer participant lacks the agent reviewer role', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // Seed a same-id participant without the reviewer role: the guard must fail loudly rather
+    // than skip registration and let canReview throw a misleading "no self-review" error.
+    await ledger.addParticipant(roomId, { id: 'rev', kind: 'agent', roles: ['validator'], displayName: 'rev' }, deps.now())
+    await expect(
+      runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev', '--verdict', 'approved'], deps),
+    ).rejects.toThrow(/already exists without the agent reviewer role/)
+  })
+
+  it('fails fast on an unknown task without writing an orphan reviewer participant', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    await expect(
+      runCli(['review', '--room', roomId, '--task', 'ghost', '--reviewer', 'rev', '--verdict', 'approved'], deps),
+    ).rejects.toThrow(/not found/)
+    const after = await ledger.getState(roomId)
+    expect(after?.participants.some(p => p.id === 'rev')).toBe(false)
+  })
+})
+
 describe('escalate', () => {
   it('records an ÆLLI escalation with the stub recommendation when a review rejected the task', async () => {
     const { ledger, deps } = await fixture()
