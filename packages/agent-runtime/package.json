@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@octowiz/doctrine": "workspace:*",
     "@octowiz/room-ledger": "workspace:*",
     "@octowiz/schemas": "workspace:*"
   },
