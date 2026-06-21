@@ -15,6 +15,7 @@ import { generatePullRequestBody, openPullRequestForBranch } from '@octowiz/gith
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
+import { ReviewVerdictSchema } from '@octowiz/schemas'
 import { defaultReadFile, loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
@@ -187,9 +188,14 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
         throw new Error(`room "${roomId}" not found`)
       // Read-only surfacing of the selection — no ledger mutation (no schema change in this
       // slice). `review` is the default stage because that's the gate most runs hit first.
+      // Validate against the six concrete stages: 'all' is a skill marker, not a step you're
+      // AT (selecting on it returns only 'all'-tagged skills), so reject it like any unknown.
+      const stages = ['plan', 'implement', 'review', 'validate', 'escalate', 'deliver'] as const
       const stage = (values.stage as string | undefined) ?? 'review'
+      if (!(stages as readonly string[]).includes(stage))
+        throw new Error(`unknown stage "${stage}" (expected plan | implement | review | validate | escalate | deliver)`)
       const approved = await loadApprovedSkills(readFile, skillRegistryPath)
-      const selected = selectSkills(approved, { stage: stage as WorkflowStage })
+      const selected = selectSkills(approved, { stage: stage as Exclude<WorkflowStage, 'all'> })
       console.log(`selected skills (${stage}): ${selected.map(s => s.id).join(', ') || '(none)'}`)
       return state
     }
@@ -197,7 +203,12 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const roomId = flag(values, 'room')
       const taskId = flag(values, 'task')
       const reviewerId = flag(values, 'reviewer')
-      const verdict = flag(values, 'verdict')
+      // Validate the verdict at the CLI boundary, BEFORE any participant write or the worker
+      // runs — an invalid verdict must fail fast rather than dispatch a doomed review.
+      const parsedVerdict = ReviewVerdictSchema.safeParse(flag(values, 'verdict'))
+      if (!parsedVerdict.success)
+        throw new Error(`invalid verdict "${values.verdict}" (expected approved | rejected | changes_requested)`)
+      const verdict = parsedVerdict.data
       // Fail fast: registering the reviewer below would write an orphan participant.joined
       // event before dispatchReview's reducer rejects an unknown task, and an unknown room
       // throws a cryptic "first event must be room.created" — so verify both exist first.
@@ -224,7 +235,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
         taskId,
         prompt,
         reviewId: `rev-${roomId}-${taskId}-${reviewerId}-${now()}`,
-        verdict: verdict as ReviewVerdict,
+        verdict,
         at: now(),
       })
     }
@@ -245,6 +256,10 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       if (!ready)
         throw new Error(`not ready to merge task "${taskId}": ${reasons.join('; ')}`)
       const branch = flag(values, 'branch')
+      // Default to 'main' when absent, but reject an explicit empty --base: parseArgs lets
+      // `--base ''` through and an empty base would produce a nonsense `gh pr create --base`.
+      if (values.base === '')
+        throw new Error('--base must not be empty')
       const base = (values.base as string | undefined) ?? 'main'
       const body = generatePullRequestBody(state, taskId)
       const url = await openPullRequestForBranch({ branch, base, title: task.title, body }, run)

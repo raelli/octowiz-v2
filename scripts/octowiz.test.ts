@@ -21,14 +21,16 @@ async function fixture() {
   }
   // Stub the new seams: hermetic, no real model/ÆLLI/registry. No command consumes them in
   // this slice — they exist so the enlarged Deps stays satisfiable — but later slices will.
-  const worker = async ({ role }: { role: string }) => ({ text: `${role}: looks good` })
+  // A vi.fn so tests can assert the worker's input (the reviewer prompt) and that an invalid
+  // verdict short-circuits BEFORE the worker is ever called.
+  const worker = vi.fn(async ({ role }: { role: string }) => ({ text: `${role}: looks good` }))
   const aelliClient = async () => 'aelli: proceed with caution'
   const readFile = async () => JSON.stringify({ schemaVersion: '0.1.0', skills: [] })
   const skillRegistryPath = 'skills/registry.json'
   // A trivial real-`pnpm`-free check so `validate` runs the injected list, not the monorepo suite.
   const checks = [{ name: 'noop', cmd: 'true', args: [] }]
   const deps = { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks }
-  return { root, ledger, now, run, provider, deps }
+  return { root, ledger, now, run, worker, provider, deps }
 }
 
 describe('create-room', () => {
@@ -239,6 +241,41 @@ describe('review', () => {
     const after = await ledger.getState(roomId)
     expect(after?.participants.some(p => p.id === 'rev')).toBe(false)
   })
+
+  it('rejects an invalid verdict at the CLI boundary without dispatching the worker', async () => {
+    const { ledger, deps, worker } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+    await expect(
+      runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev', '--verdict', 'foo'], deps),
+    ).rejects.toThrow(/invalid verdict/)
+    // The validation short-circuits before any review is dispatched.
+    expect(worker).not.toHaveBeenCalled()
+  })
+
+  it('passes the captured working-tree diff to the reviewer worker as its prompt', async () => {
+    const { ledger, deps, worker } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+    // `git -C <repo> diff` returns this fixture diff verbatim (trailing newline included);
+    // the review case must hand it to the worker unchanged as the reviewer prompt.
+    const diff = 'diff --git a/x b/x\n+real change\n'
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (cmd === 'git' && args.includes('diff'))
+        return { code: 0, stdout: diff, stderr: '' }
+      return { code: 0, stdout: '', stderr: '' }
+    })
+    await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev', '--verdict', 'approved', '--repo', '/repos/app'], { ...deps, run })
+    expect(worker).toHaveBeenCalledWith({ role: 'reviewer', prompt: diff })
+  })
 })
 
 describe('escalate', () => {
@@ -307,6 +344,20 @@ describe('skills', () => {
     const after = await ledger.getState(roomId)
     expect(after?.reviews).toEqual([])
   })
+
+  it('rejects --stage all ("all" is a skill marker, not a workflow step)', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    await expect(runCli(['skills', '--room', roomId, '--stage', 'all'], deps)).rejects.toThrow(/unknown stage/)
+  })
+
+  it('rejects an unknown --stage value', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    await expect(runCli(['skills', '--room', roomId, '--stage', 'bogus'], deps)).rejects.toThrow(/unknown stage/)
+  })
 })
 
 describe('deliver', () => {
@@ -372,6 +423,28 @@ describe('deliver', () => {
     ])
     // ...and the task advanced to merged.
     expect(state.tasks.find(t => t.id === taskId)?.status).toBe('merged')
+  })
+
+  it('rejects an explicit empty --base on an otherwise merge-ready task', async () => {
+    const { deps } = await fixture()
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (cmd === 'gh' && args.includes('create'))
+        return { code: 0, stdout: 'https://github.com/raelli/octowiz-v2/pull/1\n', stderr: '' }
+      return { code: 0, stdout: '', stderr: '' }
+    })
+    const d = { ...deps, run }
+    const created = await runCli(['create-room', '--name', 'Demo'], d)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'Ship it'], d)
+    const taskId = withTask.tasks[0]!.id
+    // Drive to merge-ready so the empty-base guard (which sits past the readiness gate and
+    // after --branch) is the assertion that actually fires.
+    await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], d)
+    await runCli(['validate', '--room', roomId, '--task', taskId], d)
+    await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev-1', '--verdict', 'approved'], d)
+    await expect(
+      runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x', '--base', ''], d),
+    ).rejects.toThrow(/base must not be empty/)
   })
 })
 
