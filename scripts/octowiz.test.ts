@@ -2,6 +2,7 @@ import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { generatePullRequestBody } from '@octowiz/github-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { describe, expect, it, vi } from 'vitest'
 import { runCli } from './octowiz'
@@ -305,6 +306,72 @@ describe('skills', () => {
     expect(state.escalations).toEqual([])
     const after = await ledger.getState(roomId)
     expect(after?.reviews).toEqual([])
+  })
+})
+
+describe('deliver', () => {
+  it('refuses a not-merge-ready task and surfaces the unmet reasons', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // A fresh task: open, unassigned, no validation/review — squarely not merge-ready.
+    // No --branch: the readiness gate throws before the deliver case reads --branch, so the
+    // refusal must not depend on it.
+    await expect(
+      runCli(['deliver', '--room', roomId, '--task', taskId], deps),
+    ).rejects.toThrow(/not ready to merge/i)
+  })
+
+  it('opens a PR and sets status merged for a merge-ready task', async () => {
+    const { deps } = await fixture()
+    const url = 'https://github.com/raelli/octowiz-v2/pull/99'
+    // One recording run across every leg: the PR URL for `gh pr create`, code 0 otherwise —
+    // which clears git (switch/push) AND the `noop` validation check so validate passes.
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (cmd === 'gh' && args.includes('create'))
+        return { code: 0, stdout: `${url}\n`, stderr: '' }
+      return { code: 0, stdout: '', stderr: '' }
+    })
+    const d = { ...deps, run }
+    const created = await runCli(['create-room', '--name', 'Demo'], d)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'Ship it'], d)
+    const taskId = withTask.tasks[0]!.id
+    // Drive the real commands to a merge-ready state: assign → validate (passes) → approve.
+    await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], d)
+    await runCli(['validate', '--room', roomId, '--task', taskId], d)
+    await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev-1', '--verdict', 'approved'], d)
+
+    // Capture the room state the deliver case will read to build the PR body: deliver only
+    // mutates (status -> merged) AFTER computing the body, and generatePullRequestBody is pure,
+    // so this state produces the exact body the command passes to `gh pr create`.
+    const preDeliver = (await d.ledger.getState(roomId))!
+    const expectedBody = generatePullRequestBody(preDeliver, taskId)
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const state = await runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x', '--base', 'main'], d)
+    expect(log).toHaveBeenCalledWith(url)
+    log.mockRestore()
+
+    // The PR was opened via `gh pr create` with the exact argv (order matches openPullRequest):
+    // --base main --head feat/x --title <task title> --body <generatePullRequestBody>.
+    const ghCall = run.mock.calls.find(([cmd, args]) => cmd === 'gh' && args.includes('create'))!
+    expect(ghCall[1]).toEqual([
+      'pr',
+      'create',
+      '--base',
+      'main',
+      '--head',
+      'feat/x',
+      '--title',
+      'Ship it',
+      '--body',
+      expectedBody,
+    ])
+    // ...and the task advanced to merged.
+    expect(state.tasks.find(t => t.id === taskId)?.status).toBe('merged')
   })
 })
 
