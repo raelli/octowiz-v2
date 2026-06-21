@@ -132,6 +132,84 @@ export async function dispatchReview(input: DispatchReviewInput): Promise<RoomSt
   )
 }
 
+/** Why the runtime is escalating, plus the room/task it concerns — the input to the handoff. */
+export interface EscalationHandoffRequest {
+  roomId: string
+  taskId: string
+  reason: string
+}
+
+/**
+ * The ÆLLI escalation handoff seam: a single injected async function that takes the escalation
+ * context and returns ÆLLI's recommendation as a string. Redefined locally — the same stance as
+ * `Run`/`AgentWorker` above — so agent-runtime takes no dependency on another package just for a
+ * type, and stays unit-testable with a fake (no real ÆLLI client, transport, or network).
+ *
+ * Deliberately NOT `@octowiz/aelli-adapter`'s `AelliClient`: that seam takes a heavy
+ * `AelliEscalationRequest` (room + task + every review/validation) derived from a full
+ * `RoomState`, which is M9b's flow. The dispatch path only has `roomId/taskId/reason`, so reusing
+ * it would force agent-runtime to re-load state and rebuild that payload — the opposite of a thin
+ * seam, and the M9b duplication #32 warns against.
+ */
+export type EscalationHandoff = (request: EscalationHandoffRequest) => Promise<string>
+
+/** Everything the escalation handoff path needs — `DispatchInput` plus the handoff seam. */
+export interface HandoffEscalationInput {
+  ledger: RoomLedger
+  worker: AgentWorker
+  handoff: EscalationHandoff
+  roomId: string
+  participant: Participant
+  taskId: string
+  prompt: string
+  at: string
+}
+
+/**
+ * The ÆLLI escalation handoff path: run the advisor's work, and if it fails — the
+ * canonical escalation condition ("the local worker fails") — hand off through the injected
+ * `handoff` seam and record the escalation via the existing `escalation.recorded` ledger event,
+ * so the recommendation is immediately visible in room state.
+ *
+ * Topology, decided explicitly so it doesn't overlap the M6a `dispatch` spine (which records
+ * advisor output as an escalation UNCONDITIONALLY): this is the CONDITIONAL fallback. A
+ * successful worker run passes through unchanged — the seam is never called and nothing is
+ * recorded; the current `RoomState` is returned. Only a worker failure triggers the handoff.
+ *
+ * Fails closed, mirroring `aelli-adapter`'s `recordAelliEscalation`: the ledger is written only
+ * after the seam answers, so a rejecting handoff records nothing and the rejection propagates —
+ * a lost handoff must never look like a recorded escalation.
+ *
+ * `reason` is the worker's failure; `recommendation` is what the handoff seam returned. `at` is a
+ * caller-supplied ISO timestamp (pure core), and the escalation id is derived from the dispatch
+ * coordinates the same way as `dispatch`, since the ledger rejects duplicate ids.
+ */
+export async function handoffEscalation(input: HandoffEscalationInput): Promise<RoomState> {
+  const { ledger, worker, handoff, roomId, participant, taskId, prompt, at } = input
+  if (!participant.roles.includes('advisor'))
+    throw new Error(`handoffEscalation requires the advisor role; "${participant.id}" holds [${participant.roles.join(', ')}]`)
+
+  try {
+    await worker({ role: 'advisor', prompt })
+  }
+  catch (error) {
+    const reason = `agent escalated: ${error instanceof Error ? error.message : String(error)}`
+    const recommendation = await handoff({ roomId, taskId, reason })
+    const id = `esc-${roomId}-${taskId}-${participant.id}-${at}`
+    return ledger.recordEscalation(
+      roomId,
+      { id, roomId, taskId, reason, recommendation, createdAt: at },
+      at,
+    )
+  }
+
+  // The worker handled it: no escalation condition fired, so pass through unchanged.
+  const state = await ledger.getState(roomId)
+  if (state === null)
+    throw new Error(`room "${roomId}" has no state`)
+  return state
+}
+
 /**
  * The injected exec seam, identical in shape to sandbox-runtime's `Run`: a single function the
  * caller supplies to shell out to a binary. Redefined locally — same as every other adapter
