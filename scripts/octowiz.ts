@@ -1,20 +1,21 @@
 import type { AelliClient } from '@octowiz/aelli-adapter'
 import type { AgentWorker } from '@octowiz/agent-runtime'
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
-import type { RoomState } from '@octowiz/schemas'
+import type { ReviewVerdict, RoomState } from '@octowiz/schemas'
 import type { ReadFile } from '@octowiz/skill-runtime'
 import type { Check } from '@octowiz/validation'
 import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
-import { createLocalModelWorker } from '@octowiz/agent-runtime'
+import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
 import { defaultReadFile } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
+import { gitDiff } from './git-diff'
 
 type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
 
@@ -65,15 +66,17 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, worker, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
       name: { type: 'string' },
       room: { type: 'string' },
       repo: { type: 'string' },
+      reviewer: { type: 'string' },
       task: { type: 'string' },
       title: { type: 'string' },
+      verdict: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -125,6 +128,33 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const validation = await runValidation(taskId, checks, run, now())
       return ledger.recordValidation(roomId, validation, now())
     }
+    case 'review': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const reviewerId = flag(values, 'reviewer')
+      const verdict = flag(values, 'verdict')
+      let state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      // Register the reviewer idempotently — dispatchReview's canReview gate requires a known
+      // participant holding the reviewer role, so skip re-adding one already present.
+      if (!state.participants.some(p => p.id === reviewerId))
+        state = await ledger.addParticipant(roomId, { id: reviewerId, kind: 'agent', roles: ['reviewer'], displayName: reviewerId }, now())
+      const participant = state.participants.find(p => p.id === reviewerId)!
+      // Capture the implementer's working-tree diff as the reviewer prompt; '' when no repo given.
+      const prompt = values.repo ? await gitDiff(values.repo, run) : ''
+      return dispatchReview({
+        ledger,
+        worker,
+        roomId,
+        participant,
+        taskId,
+        prompt,
+        reviewId: `rev-${roomId}-${taskId}-${reviewerId}-${now()}`,
+        verdict: verdict as ReviewVerdict,
+        at: now(),
+      })
+    }
     case 'status': {
       const roomId = flag(values, 'room')
       const state = await ledger.getState(roomId)
@@ -140,7 +170,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | review | status | up)`)
   }
 }
 

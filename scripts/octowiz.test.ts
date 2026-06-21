@@ -100,6 +100,40 @@ describe('up', () => {
   })
 })
 
+describe('review', () => {
+  it('records an approving review from a different reviewer in room state', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // Set up the implementer directly via the ledger (no `assign` command on this branch).
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+
+    const state = await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev', '--verdict', 'approved'], deps)
+
+    expect(state.participants.some(p => p.id === 'rev' && p.roles.includes('reviewer'))).toBe(true)
+    expect(state.reviews).toHaveLength(1)
+    expect(state.reviews[0]).toMatchObject({ taskId, reviewerId: 'rev', verdict: 'approved', notes: 'reviewer: looks good' })
+  })
+
+  it('refuses a self-review (reviewer is the task implementer)', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    await ledger.addParticipant(roomId, { id: 'imp', kind: 'agent', roles: ['implementer'], displayName: 'imp' }, deps.now())
+    await ledger.assignTask(roomId, taskId, 'imp', deps.now())
+
+    await expect(
+      runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'imp', '--verdict', 'approved'], deps),
+    ).rejects.toThrow(/no self-review/)
+    expect((await ledger.getState(roomId))?.reviews).toEqual([])
+  })
+})
+
 describe('errors', () => {
   it('throws on an unknown subcommand', async () => {
     const { deps } = await fixture()
