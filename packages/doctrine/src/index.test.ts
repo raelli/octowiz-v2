@@ -122,6 +122,31 @@ describe('isMergeReady', () => {
     expect(isMergeReady(state, 'tk1')).toEqual({ ready: true, reasons: [] })
   })
 
+  it('is not ready when no reviewer has a latest approval (multi-reviewer, stale approval superseded)', () => {
+    const state = baseState()
+    state.participants.push({ id: 'rev2', kind: 'agent', roles: ['reviewer'], displayName: 'Rev2' })
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    // rev approved then superseded it with changes_requested; rev2 only ever requested
+    // changes. The buggy implementation counted rev's stale approval and wrongly reported
+    // ready — this case diverges from that old behavior, which the single-reviewer cases
+    // above do not exercise.
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'changes_requested', createdAt: 't3' })
+    state.reviews.push({ id: 'rv3', taskId: 'tk1', reviewerId: 'rev2', verdict: 'changes_requested', createdAt: 't4' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
+  })
+
+  it('is not ready when a qualified reviewer\'s only verdict is a rejection', () => {
+    const state = baseState()
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'rejected', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
+  })
+
   it('is not ready when the task has no implementer', () => {
     const state = baseState()
     state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'in_review' }]
