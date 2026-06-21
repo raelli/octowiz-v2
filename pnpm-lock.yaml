@@ -428,6 +428,18 @@ importers:
 
   scripts:
     dependencies:
+      '@octowiz/aelli-adapter':
+        specifier: workspace:*
+        version: link:../packages/aelli-adapter
+      '@octowiz/agent-runtime':
+        specifier: workspace:*
+        version: link:../packages/agent-runtime
+      '@octowiz/doctrine':
+        specifier: workspace:*
+        version: link:../packages/doctrine
+      '@octowiz/github-adapter':
+        specifier: workspace:*
+        version: link:../packages/github-adapter
       '@octowiz/opencode-adapter':
         specifier: workspace:*
         version: link:../packages/opencode-adapter
@@ -440,6 +452,9 @@ importers:
       '@octowiz/schemas':
         specifier: workspace:*
         version: link:../packages/schemas
+      '@octowiz/skill-runtime':
+        specifier: workspace:*
+        version: link:../packages/skill-runtime
       '@octowiz/validation':
         specifier: workspace:*
         version: link:../packages/validation

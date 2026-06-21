@@ -9,7 +9,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@octowiz/agent-runtime": "workspace:*",
+    "@octowiz/aelli-adapter": "workspace:*",
+    "@octowiz/doctrine": "workspace:*",
+    "@octowiz/github-adapter": "workspace:*",
     "@octowiz/opencode-adapter": "workspace:*",
+    "@octowiz/skill-runtime": "workspace:*",
     "@octowiz/room-ledger": "workspace:*",
     "@octowiz/sandbox-runtime": "workspace:*",
     "@octowiz/schemas": "workspace:*",

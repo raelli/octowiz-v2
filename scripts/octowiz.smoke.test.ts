@@ -25,8 +25,15 @@ it('creates a real zellij session and records both session.started events', asyn
   // Fake provider: this smoke targets the real zellij leg. Exercising a real container
   // runtime is the M5c gated smoke's job (and would need cleanup), so keep podman out here.
   const provider = { name: 'fake', create: async (roomId: string) => ({ provider: 'fake', id: `sbx-${roomId}`, roomId }), destroy: async () => {} }
+  // The `up` path consumes none of the new seams, but the enlarged Deps requires them — stub
+  // them hermetically so the smoke targets the real zellij leg without a real model/ÆLLI.
+  const worker = async ({ role }: { role: string }) => ({ text: `${role}: looks good` })
+  const aelliClient = async () => 'aelli: proceed with caution'
+  const readFile = async () => JSON.stringify({ schemaVersion: '0.1.0', skills: [] })
+  const skillRegistryPath = 'skills/registry.json'
+  const checks = [{ name: 'noop', cmd: 'true', args: [] }]
 
-  const state = await runCli(['up', '--name', 'SmokeRoom', '--repo', process.cwd()], { ledger, run: defaultRun, now, provider })
+  const state = await runCli(['up', '--name', 'SmokeRoom', '--repo', process.cwd()], { ledger, run: defaultRun, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks })
   const name = sessionName(state.room.id)
   try {
     expect(state.sessions.map(s => s.tool)).toEqual(['zellij', 'opencode'])
