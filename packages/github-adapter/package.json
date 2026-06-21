@@ -11,6 +11,10 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@octowiz/doctrine": "workspace:*",
+    "@octowiz/schemas": "workspace:*"
+  },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
     "@types/node": "catalog:",

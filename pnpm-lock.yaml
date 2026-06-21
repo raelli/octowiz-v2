@@ -127,6 +127,13 @@ importers:
         version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/github-adapter:
+    dependencies:
+      '@octowiz/doctrine':
+        specifier: workspace:*
+        version: link:../doctrine
+      '@octowiz/schemas':
+        specifier: workspace:*
+        version: link:../schemas
     devDependencies:
       '@octowiz/config-typescript':
         specifier: workspace:*
