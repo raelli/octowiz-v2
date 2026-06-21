@@ -80,6 +80,12 @@ importers:
       '@octowiz/layer-base':
         specifier: workspace:*
         version: link:../../layers/base
+      '@octowiz/layer-octowiz-shell':
+        specifier: workspace:*
+        version: link:../../layers/octowiz-shell
+      '@octowiz/layer-room-dashboard':
+        specifier: workspace:*
+        version: link:../../layers/room-dashboard
       '@octowiz/layer-ui':
         specifier: workspace:*
         version: link:../../layers/ui
@@ -119,6 +125,47 @@ importers:
         version: 3.3.5(typescript@6.0.3)
 
   layers/base:
+    devDependencies:
+      '@octowiz/config-typescript':
+        specifier: workspace:*
+        version: link:../../packages/config-typescript
+      nuxt:
+        specifier: 'catalog:'
+        version: 4.4.8(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7))(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.38)(cac@6.7.14)(db0@0.3.4)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.32.0)(magicast@0.5.3)(meow@13.2.0)(optionator@0.9.4)(rolldown@1.0.3)(rollup-plugin-visualizer@7.0.1(rolldown@1.0.3)(rollup@4.62.2))(rollup@4.62.2)(terser@5.48.0)(tsx@4.22.4)(typescript@6.0.3)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.9(@types/node@26.0.0)(happy-dom@20.10.6)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  layers/octowiz-shell:
+    dependencies:
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.38(typescript@6.0.3)
+    devDependencies:
+      '@octowiz/config-typescript':
+        specifier: workspace:*
+        version: link:../../packages/config-typescript
+      nuxt:
+        specifier: 'catalog:'
+        version: 4.4.8(@babel/plugin-syntax-jsx@7.29.7(@babel/core@7.29.7))(@babel/plugin-syntax-typescript@7.29.7(@babel/core@7.29.7))(@parcel/watcher@2.5.6)(@types/node@26.0.0)(@vue/compiler-sfc@3.5.38)(cac@6.7.14)(db0@0.3.4)(eslint@10.5.0(jiti@2.7.0))(ioredis@5.11.1)(lightningcss@1.32.0)(magicast@0.5.3)(meow@13.2.0)(optionator@0.9.4)(rolldown@1.0.3)(rollup-plugin-visualizer@7.0.1(rolldown@1.0.3)(rollup@4.62.2))(rollup@4.62.2)(terser@5.48.0)(tsx@4.22.4)(typescript@6.0.3)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(yaml@2.9.0)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.9(@types/node@26.0.0)(happy-dom@20.10.6)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  layers/room-dashboard:
+    dependencies:
+      '@octowiz/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.38(typescript@6.0.3)
     devDependencies:
       '@octowiz/config-typescript':
         specifier: workspace:*

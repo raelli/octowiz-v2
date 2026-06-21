@@ -9,9 +9,17 @@
   --ow-color-text: #e6edf3;
   --ow-color-text-muted: #8b949e;
 
-  /* Status accents. */
+  /* Room status accents. */
   --ow-color-active: #2ea043;
   --ow-color-archived: #8b949e;
+
+  /* Task status accents (room-dashboard task-state panel). */
+  --ow-color-task-open: #8b949e;
+  --ow-color-task-in_progress: #d29922;
+  --ow-color-task-in_review: #58a6ff;
+  --ow-color-task-validated: #2ea043;
+  --ow-color-task-merged: #a371f7;
+  --ow-color-task-blocked: #f85149;
 
   --ow-space-1: 0.25rem;
   --ow-space-2: 0.5rem;

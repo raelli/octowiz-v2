@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { RoomState } from '@octowiz/schemas'
 
-// The thin vertical slice: read one real room's status from the ledger projection (via the
-// server route) and render its identity + status badge. Read-only, single fetch on load.
+// Read one real room's projection from the ledger (via the server route) and render it in
+// the product shell: the M10a identity + status block, plus the M10b participants and
+// task-state panels. Read-only, single fetch on load.
+//
+// RoomShell, StatusBadge, ParticipantsPanel and TaskStatePanel are auto-imported across the
+// composed layers (ui / octowiz-shell / room-dashboard).
 const { roomId } = useRuntimeConfig().public
 
 const { data: state, error } = await useFetch<RoomState>(`/api/rooms/${roomId}`)
@@ -11,44 +15,67 @@ useHead({ title: () => state.value?.room.name ?? 'Room not found' })
 </script>
 
 <template>
-  <main class="page">
+  <RoomShell>
+    <template #brand>
+      Octowiz
+    </template>
+
+    <!-- M10a: room identity + status, preserved in the shell header. -->
+    <template v-if="state" #header>
+      <h1 class="room__name">
+        {{ state.room.name }}
+      </h1>
+      <StatusBadge :status="state.room.status" />
+    </template>
+
+    <template v-if="state" #sidebar>
+      <nav class="nav" aria-label="Room sections">
+        <p class="nav__heading">
+          Room
+        </p>
+        <p class="nav__id">
+          ID: <code>{{ state.room.id }}</code>
+        </p>
+      </nav>
+    </template>
+
+    <!-- Main status region: M10a id line + the M10b panels, mounted additively. -->
     <template v-if="state">
-      <header class="room">
-        <h1 class="room__name">
-          {{ state.room.name }}
-        </h1>
-        <StatusBadge :status="state.room.status" />
-      </header>
       <p class="room__id">
         Room ID: <code>{{ state.room.id }}</code>
       </p>
+      <ParticipantsPanel :participants="state.participants" />
+      <TaskStatePanel :tasks="state.tasks" />
     </template>
     <p v-else class="error">
       Could not load room <code>{{ roomId }}</code>{{ error ? `: ${error.statusMessage}` : '' }}.
     </p>
-  </main>
+  </RoomShell>
 </template>
 
 <style scoped>
-.page {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: var(--ow-space-4);
-}
-
-.room {
-  display: flex;
-  align-items: center;
-  gap: var(--ow-space-3);
-  flex-wrap: wrap;
-}
-
 .room__name {
   margin: 0;
-  font-size: 1.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.nav__heading {
+  margin: 0 0 var(--ow-space-2);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ow-color-text-muted);
+}
+
+.nav__id {
+  margin: 0;
+  color: var(--ow-color-text-muted);
+  font-size: 0.875rem;
 }
 
 .room__id {
+  margin: 0;
   color: var(--ow-color-text-muted);
 }
 

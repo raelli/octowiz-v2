@@ -1,0 +1,20 @@
+{
+  "name": "@octowiz/layer-octowiz-shell",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "nuxt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
