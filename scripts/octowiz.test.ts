@@ -308,6 +308,51 @@ describe('skills', () => {
   })
 })
 
+describe('deliver', () => {
+  it('refuses a not-merge-ready task and surfaces the unmet reasons', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // A fresh task: open, unassigned, no validation/review — squarely not merge-ready.
+    await expect(
+      runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x'], deps),
+    ).rejects.toThrow(/not ready to merge/i)
+  })
+
+  it('opens a PR and sets status merged for a merge-ready task', async () => {
+    const { deps } = await fixture()
+    const url = 'https://github.com/raelli/octowiz-v2/pull/99'
+    // One recording run across every leg: the PR URL for `gh pr create`, code 0 otherwise —
+    // which clears git (switch/push) AND the `noop` validation check so validate passes.
+    const run = vi.fn(async (cmd: string, args: string[]) => {
+      if (cmd === 'gh' && args.includes('create'))
+        return { code: 0, stdout: `${url}\n`, stderr: '' }
+      return { code: 0, stdout: '', stderr: '' }
+    })
+    const d = { ...deps, run }
+    const created = await runCli(['create-room', '--name', 'Demo'], d)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'Ship it'], d)
+    const taskId = withTask.tasks[0]!.id
+    // Drive the real commands to a merge-ready state: assign → validate (passes) → approve.
+    await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], d)
+    await runCli(['validate', '--room', roomId, '--task', taskId], d)
+    await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev-1', '--verdict', 'approved'], d)
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const state = await runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x', '--base', 'main'], d)
+    expect(log).toHaveBeenCalledWith(url)
+    log.mockRestore()
+
+    // The PR was opened via `gh pr create`...
+    expect(run.mock.calls.some(([cmd, args]) => cmd === 'gh' && args.includes('create'))).toBe(true)
+    // ...and the task advanced to merged.
+    expect(state.tasks.find(t => t.id === taskId)?.status).toBe('merged')
+  })
+})
+
 describe('errors', () => {
   it('throws on an unknown subcommand', async () => {
     const { deps } = await fixture()

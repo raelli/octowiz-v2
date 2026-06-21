@@ -10,6 +10,8 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { buildEscalationRequest, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
 import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
+import { isMergeReady } from '@octowiz/doctrine'
+import { generatePullRequestBody, openPullRequestForBranch } from '@octowiz/github-adapter'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
@@ -80,6 +82,8 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       verdict: { type: 'string' },
       agent: { type: 'string' },
       stage: { type: 'string' },
+      branch: { type: 'string' },
+      base: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -223,6 +227,29 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
         at: now(),
       })
     }
+    case 'deliver': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      // Mirror the assign/review/validate preflight: fail fast on an unknown room/task
+      // before the merge-readiness gate touches anything.
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      const task = state.tasks.find(t => t.id === taskId)
+      if (task === undefined)
+        throw new Error(`task "${taskId}" not found in room "${roomId}"`)
+      // Gate on doctrine: refuse unless merge-ready, surfacing every unmet reason. Read
+      // --branch only past the gate so the refusal path doesn't depend on it.
+      const { ready, reasons } = isMergeReady(state, taskId)
+      if (!ready)
+        throw new Error(`not ready to merge task "${taskId}": ${reasons.join('; ')}`)
+      const branch = flag(values, 'branch')
+      const base = (values.base as string | undefined) ?? 'main'
+      const body = generatePullRequestBody(state, taskId)
+      const url = await openPullRequestForBranch({ branch, base, title: task.title, body }, run)
+      console.log(url)
+      return ledger.setTaskStatus(roomId, taskId, 'merged', now())
+    }
     case 'status': {
       const roomId = flag(values, 'room')
       const state = await ledger.getState(roomId)
@@ -238,7 +265,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills | deliver)`)
   }
 }
 
