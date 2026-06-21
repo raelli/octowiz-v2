@@ -2,6 +2,7 @@ import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { generatePullRequestBody } from '@octowiz/github-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { describe, expect, it, vi } from 'vitest'
 import { runCli } from './octowiz'
@@ -316,8 +317,10 @@ describe('deliver', () => {
     const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
     const taskId = withTask.tasks[0]!.id
     // A fresh task: open, unassigned, no validation/review — squarely not merge-ready.
+    // No --branch: the readiness gate throws before the deliver case reads --branch, so the
+    // refusal must not depend on it.
     await expect(
-      runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x'], deps),
+      runCli(['deliver', '--room', roomId, '--task', taskId], deps),
     ).rejects.toThrow(/not ready to merge/i)
   })
 
@@ -341,13 +344,32 @@ describe('deliver', () => {
     await runCli(['validate', '--room', roomId, '--task', taskId], d)
     await runCli(['review', '--room', roomId, '--task', taskId, '--reviewer', 'rev-1', '--verdict', 'approved'], d)
 
+    // Capture the room state the deliver case will read to build the PR body: deliver only
+    // mutates (status -> merged) AFTER computing the body, and generatePullRequestBody is pure,
+    // so this state produces the exact body the command passes to `gh pr create`.
+    const preDeliver = (await d.ledger.getState(roomId))!
+    const expectedBody = generatePullRequestBody(preDeliver, taskId)
+
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const state = await runCli(['deliver', '--room', roomId, '--task', taskId, '--branch', 'feat/x', '--base', 'main'], d)
     expect(log).toHaveBeenCalledWith(url)
     log.mockRestore()
 
-    // The PR was opened via `gh pr create`...
-    expect(run.mock.calls.some(([cmd, args]) => cmd === 'gh' && args.includes('create'))).toBe(true)
+    // The PR was opened via `gh pr create` with the exact argv (order matches openPullRequest):
+    // --base main --head feat/x --title <task title> --body <generatePullRequestBody>.
+    const ghCall = run.mock.calls.find(([cmd, args]) => cmd === 'gh' && args.includes('create'))!
+    expect(ghCall[1]).toEqual([
+      'pr',
+      'create',
+      '--base',
+      'main',
+      '--head',
+      'feat/x',
+      '--title',
+      'Ship it',
+      '--body',
+      expectedBody,
+    ])
     // ...and the task advanced to merged.
     expect(state.tasks.find(t => t.id === taskId)?.status).toBe('merged')
   })
