@@ -9,10 +9,10 @@ export type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdou
 export async function createBranch(branch: string, run: Run): Promise<void> {
   const created = await run('git', ['switch', '-c', branch])
   if (created.code !== 0)
-    throw new Error(`failed to create branch ${branch}: ${created.stderr}`)
+    throw new Error(`failed to create branch ${branch}: exit ${created.code}${created.stderr ? `: ${created.stderr}` : ' (no stderr)'}`)
   const pushed = await run('git', ['push', '-u', 'origin', branch])
   if (pushed.code !== 0)
-    throw new Error(`failed to push branch ${branch}: ${pushed.stderr}`)
+    throw new Error(`failed to push branch ${branch}: exit ${pushed.code}${pushed.stderr ? `: ${pushed.stderr}` : ' (no stderr)'}`)
 }
 
 export interface PullRequestOptions {
@@ -46,7 +46,7 @@ export async function openPullRequest(opts: PullRequestOptions, run: Run): Promi
     opts.body,
   ])
   if (result.code !== 0)
-    throw new Error(`failed to open pull request for ${opts.head}: ${result.stderr}`)
+    throw new Error(`failed to open pull request for ${opts.head}: exit ${result.code}${result.stderr ? `: ${result.stderr}` : ' (no stderr)'}`)
   const url = result.stdout.trim().split('\n').map(line => line.trim()).filter(Boolean).at(-1) ?? ''
   if (url === '')
     throw new Error(`gh pr create for ${opts.head} returned no pull request url`)
