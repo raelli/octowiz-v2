@@ -218,6 +218,35 @@ describe('escalate', () => {
   })
 })
 
+describe('skills', () => {
+  it('selects the stage\'s skills, prints their ids, and does not mutate the ledger', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    // A registry with one review-stage skill and one plan-stage skill: `--stage review`
+    // must surface the review skill only. Triggers carry all 7 (empty) arrays the schema
+    // requires; ids are drawn from the approved set.
+    const empty = { taskType: [], repoStack: [], role: [], workflowStep: [], filePaths: [], validationFailures: [], roomPolicy: [] }
+    const readFile = async () => JSON.stringify({
+      schemaVersion: '0.1.0',
+      skills: [
+        { id: 'code-review', origin: 'native', workflowStage: 'review', triggers: empty },
+        { id: 'task-planning', origin: 'native', workflowStage: 'plan', triggers: empty },
+      ],
+    })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const state = await runCli(['skills', '--room', roomId, '--task', 't', '--stage', 'review'], { ...deps, readFile })
+    expect(log).toHaveBeenCalledWith('selected skills (review): code-review')
+    log.mockRestore()
+    // Read-only: the room state carries no new reviews/validations/escalations.
+    expect(state.reviews).toEqual([])
+    expect(state.validations).toEqual([])
+    expect(state.escalations).toEqual([])
+    const after = await ledger.getState(roomId)
+    expect(after?.reviews).toEqual([])
+  })
+})
+
 describe('errors', () => {
   it('throws on an unknown subcommand', async () => {
     const { deps } = await fixture()

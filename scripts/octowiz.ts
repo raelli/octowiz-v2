@@ -2,7 +2,7 @@ import type { AelliClient } from '@octowiz/aelli-adapter'
 import type { AgentWorker } from '@octowiz/agent-runtime'
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import type { RoomState } from '@octowiz/schemas'
-import type { ReadFile } from '@octowiz/skill-runtime'
+import type { ReadFile, WorkflowStage } from '@octowiz/skill-runtime'
 import type { Check } from '@octowiz/validation'
 import { execFile } from 'node:child_process'
 import process from 'node:process'
@@ -13,7 +13,7 @@ import { createLocalModelWorker } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { selectProvider } from '@octowiz/sandbox-runtime'
-import { defaultReadFile } from '@octowiz/skill-runtime'
+import { defaultReadFile, loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 
@@ -66,7 +66,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, aelliClient, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -76,6 +76,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       task: { type: 'string' },
       title: { type: 'string' },
       agent: { type: 'string' },
+      stage: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -171,6 +172,19 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const request = buildEscalationRequest(state, taskId)
       return recordAelliEscalation(ledger, aelliClient, request, { id: `esc-${roomId}-${taskId}-${now()}`, at: now() })
     }
+    case 'skills': {
+      const roomId = flag(values, 'room')
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      // Read-only surfacing of the selection — no ledger mutation (no schema change in this
+      // slice). `review` is the default stage because that's the gate most runs hit first.
+      const stage = (values.stage as string | undefined) ?? 'review'
+      const approved = await loadApprovedSkills(readFile, skillRegistryPath)
+      const selected = selectSkills(approved, { stage: stage as WorkflowStage })
+      console.log(`selected skills (${stage}): ${selected.map(s => s.id).join(', ') || '(none)'}`)
+      return state
+    }
     case 'status': {
       const roomId = flag(values, 'room')
       const state = await ledger.getState(roomId)
@@ -186,7 +200,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | skills)`)
   }
 }
 
