@@ -73,6 +73,28 @@ importers:
         specifier: 'catalog:'
         version: 4.1.9(@types/node@26.0.0)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/agent-runtime:
+    dependencies:
+      '@octowiz/room-ledger':
+        specifier: workspace:*
+        version: link:../room-ledger
+      '@octowiz/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+    devDependencies:
+      '@octowiz/config-typescript':
+        specifier: workspace:*
+        version: link:../config-typescript
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.21
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.9(@types/node@22.19.21)(vite@8.0.16(@types/node@22.19.21)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/config-eslint:
     dependencies:
       '@antfu/eslint-config':
