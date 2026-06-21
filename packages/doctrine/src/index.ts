@@ -1,4 +1,4 @@
-import type { RoomState } from '@octowiz/schemas'
+import type { Review, RoomState } from '@octowiz/schemas'
 
 /**
  * No self-review: a reviewer may review a task only if they are a known participant
@@ -36,6 +36,19 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
 
   const reasons: string[] = []
 
+  // Fail closed on lifecycle status: only a task that has been submitted for review
+  // (in_review or validated) is a merge candidate. Validation and an approving review are
+  // necessary but NOT sufficient — the reducer records validation.recorded/review.recorded
+  // for ANY existing task, so an open, in-progress, or reopened task could otherwise carry
+  // a passing validation + approval and read as merge-ready. Distinct messages for the
+  // terminal statuses; a generic "not in review" for the not-yet-submitted ones.
+  if (task.status === 'merged')
+    reasons.push('task already merged')
+  else if (task.status === 'blocked')
+    reasons.push('task is blocked')
+  else if (task.status !== 'in_review' && task.status !== 'validated')
+    reasons.push(`task is not in review (status: ${task.status})`)
+
   // An unassigned task has no work to merge — and without an implementer, canReview's
   // self-review exclusion is vacuous, so require assignment explicitly.
   if (task.implementerId === undefined)
@@ -47,12 +60,21 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
   else if (latestValidation.status !== 'passed')
     reasons.push('latest validation did not pass')
 
+  // Only a reviewer's LATEST verdict counts: an approval later overturned by
+  // rejected/changes_requested no longer qualifies. state.reviews is appended in
+  // chronological order (room-ledger reducer), so the last entry per reviewer wins —
+  // Map keeps insertion position on overwrite, giving "last occurrence wins" for free.
+  const latestByReviewer = new Map<string, Review['verdict']>()
+  for (const r of state.reviews) {
+    if (r.taskId === taskId)
+      latestByReviewer.set(r.reviewerId, r.verdict)
+  }
   // A qualifying approval must come from someone allowed to review this task:
   // a participant holding the reviewer role who is not the implementer (canReview).
   // Checking only `reviewerId !== implementerId` would let unauthorized or ghost
   // reviewers satisfy merge-readiness, defeating the no-self-review doctrine.
-  const hasQualifiedApproval = state.reviews.some(
-    r => r.taskId === taskId && r.verdict === 'approved' && canReview(state, taskId, r.reviewerId),
+  const hasQualifiedApproval = [...latestByReviewer].some(
+    ([reviewerId, verdict]) => verdict === 'approved' && canReview(state, taskId, reviewerId),
   )
   if (!hasQualifiedApproval)
     reasons.push('no approving review from a qualified reviewer')
