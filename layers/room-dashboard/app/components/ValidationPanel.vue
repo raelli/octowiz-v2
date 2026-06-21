@@ -35,7 +35,7 @@ const CHECK_LABELS: Record<CheckStatus, string> = {
           </span>
         </div>
         <ul v-if="validation.checks.length" class="checks">
-          <li v-for="check in validation.checks" :key="check.name" class="check">
+          <li v-for="(check, index) in validation.checks" :key="`${index}-${check.name}`" class="check">
             <div class="check__main">
               <span class="check__name">{{ check.name }}</span>
               <p v-if="check.output" class="check__output">
