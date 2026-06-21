@@ -1,10 +1,10 @@
 import type { LedgerStore } from '@octowiz/room-ledger'
 import type { LedgerEvent, Participant } from '@octowiz/schemas'
-import type { AgentWorker } from './index'
+import type { AgentWorker, Run } from './index'
 import { RoomLedger } from '@octowiz/room-ledger'
 import { ParticipantRoleSchema } from '@octowiz/schemas'
 import { describe, expect, it } from 'vitest'
-import { AGENT_ROLES, assignRole, dispatch, dispatchReview } from './index'
+import { AGENT_ROLES, assignRole, createLocalModelWorker, dispatch, dispatchReview } from './index'
 
 // In-memory store keeps the dispatch tests pure — no tmpdir, no filesystem. It mirrors
 // FileLedgerStore's append/read contract closely enough to drive RoomLedger end to end.
@@ -278,5 +278,84 @@ describe('dispatchReview', () => {
         at: '2026-06-21T01:00:00.000Z',
       }),
     ).rejects.toThrow()
+  })
+})
+
+// Records every shell-out so the argv the worker builds can be asserted exactly, and returns
+// a caller-supplied result — the local-model analogue of sandbox-runtime's stub `Run`. No real
+// model, process, or network is involved.
+function stubRun(result: { code: number, stdout: string, stderr: string }): {
+  run: Run
+  calls: { cmd: string, args: string[] }[]
+} {
+  const calls: { cmd: string, args: string[] }[] = []
+  const run: Run = async (cmd, args) => {
+    calls.push({ cmd, args })
+    return result
+  }
+  return { run, calls }
+}
+
+describe('createLocalModelWorker', () => {
+  it('shells out to the configured CLI with the prompt and role, mapping stdout to output', async () => {
+    const { run, calls } = stubRun({ code: 0, stdout: 'the model says hello\n', stderr: '' })
+    const worker = createLocalModelWorker(run, { command: 'llama' })
+
+    const output = await worker({ role: 'advisor', prompt: 'is the contract sound?' })
+
+    // The injected exec seam was invoked exactly once with the configured binary.
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.cmd).toBe('llama')
+    // The prompt and role both reach the CLI through argv (Run has no stdin).
+    expect(calls[0]?.args).toContain('is the contract sound?')
+    expect(calls[0]?.args).toContain('advisor')
+    // stdout becomes the agent output text, trimmed of the trailing newline.
+    expect(output.text).toBe('the model says hello')
+  })
+
+  it('passes configured extra args ahead of the role/prompt', async () => {
+    const { run, calls } = stubRun({ code: 0, stdout: 'ok', stderr: '' })
+    const worker = createLocalModelWorker(run, { command: 'llama', args: ['--model', 'q4'] })
+
+    await worker({ role: 'reviewer', prompt: 'review this' })
+
+    expect(calls[0]?.args).toEqual(['--model', 'q4', '--role', 'reviewer', '--prompt', 'review this'])
+  })
+
+  it('throws on a non-zero exit, surfacing stderr', async () => {
+    const { run } = stubRun({ code: 1, stdout: '', stderr: 'model not found' })
+    const worker = createLocalModelWorker(run, { command: 'llama' })
+
+    await expect(worker({ role: 'advisor', prompt: 'p' })).rejects.toThrow(/model not found/)
+  })
+
+  it('throws when the CLI produces no output on a successful exit', async () => {
+    const { run } = stubRun({ code: 0, stdout: '   \n', stderr: '' })
+    const worker = createLocalModelWorker(run, { command: 'llama' })
+
+    await expect(worker({ role: 'advisor', prompt: 'p' })).rejects.toThrow(/no output/)
+  })
+
+  it('is usable as the worker passed to the M6a dispatch path, producing recorded output', async () => {
+    const { ledger, advisor } = await seedRoom()
+    const { run, calls } = stubRun({ code: 0, stdout: 'escalate: unsure about the API\n', stderr: '' })
+    const worker = createLocalModelWorker(run, { command: 'llama' })
+
+    const state = await dispatch({
+      ledger,
+      worker,
+      roomId: 'r1',
+      participant: advisor,
+      taskId: 't1',
+      prompt: 'should we change the contract?',
+      at: '2026-06-21T01:00:00.000Z',
+    })
+
+    // The dispatch path drove the local worker, which shelled out via the stub Run.
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.args).toContain('should we change the contract?')
+    // The model's stdout is the recorded escalation reason.
+    expect(state.escalations).toHaveLength(1)
+    expect(state.escalations[0]?.reason).toBe('escalate: unsure about the API')
   })
 })
