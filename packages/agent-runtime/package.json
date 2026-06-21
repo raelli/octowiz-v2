@@ -1,5 +1,5 @@
 {
-  "name": "@octowiz/github-adapter",
+  "name": "@octowiz/agent-runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@octowiz/doctrine": "workspace:*"
+    "@octowiz/room-ledger": "workspace:*",
+    "@octowiz/schemas": "workspace:*"
   },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
-    "@octowiz/schemas": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
