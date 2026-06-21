@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@octowiz/layer-base": "workspace:*",
+    "@octowiz/layer-octowiz-shell": "workspace:*",
+    "@octowiz/layer-room-dashboard": "workspace:*",
     "@octowiz/layer-ui": "workspace:*",
     "@octowiz/room-ledger": "workspace:*",
     "@octowiz/schemas": "workspace:*",
