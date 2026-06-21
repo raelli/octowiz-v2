@@ -1,5 +1,5 @@
 {
-  "name": "@octowiz/aelli-adapter",
+  "name": "@octowiz/skill-runtime",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@octowiz/room-ledger": "workspace:*",
-    "@octowiz/schemas": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
