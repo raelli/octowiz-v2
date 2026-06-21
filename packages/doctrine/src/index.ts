@@ -61,9 +61,15 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
     reasons.push('latest validation did not pass')
 
   // Only a reviewer's LATEST verdict counts: an approval later overturned by
-  // rejected/changes_requested no longer qualifies. state.reviews is appended in
-  // chronological order (room-ledger reducer), so the last entry per reviewer wins —
-  // Map keeps insertion position on overwrite, giving "last occurrence wins" for free.
+  // rejected/changes_requested no longer qualifies. CONTRACT (#9): "latest" means the
+  // last-APPENDED review for that reviewer — ledger append order is authoritative, NOT
+  // the caller-supplied `createdAt`. The reducer never validates `createdAt` monotonicity,
+  // so a replayed or clock-skewed event can carry a stale timestamp; consulting it would
+  // let a stale approval re-enable merge. Append order reflects the real decision order only
+  // under room-ledger's documented single-writer-per-room PRECONDITION (its read-validate-
+  // append window is not atomic, so concurrent writers can interleave); enforcing that is a
+  // ledger-layer concern (transactional backend), not doctrine's. A Map keeps insertion
+  // position on overwrite, giving "last appended per reviewer wins" free. Regression-pinned below.
   const latestByReviewer = new Map<string, Review['verdict']>()
   for (const r of state.reviews) {
     if (r.taskId === taskId)
