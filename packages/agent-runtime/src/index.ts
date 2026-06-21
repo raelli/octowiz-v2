@@ -1,5 +1,6 @@
 import type { RoomLedger } from '@octowiz/room-ledger'
-import type { Participant, ParticipantRole, RoomState } from '@octowiz/schemas'
+import type { Participant, ParticipantRole, ReviewVerdict, RoomState } from '@octowiz/schemas'
+import { canReview } from '@octowiz/doctrine'
 import { ParticipantRoleSchema } from '@octowiz/schemas'
 
 /** One of the assignable agent roles: every schema role except the non-agent `steward`. */
@@ -85,6 +86,48 @@ export async function dispatch(input: DispatchInput): Promise<RoomState> {
   return ledger.recordEscalation(
     roomId,
     { id, roomId, taskId, reason: output.text, createdAt: at },
+    at,
+  )
+}
+
+/**
+ * Everything the reviewer dispatch path needs. Like `DispatchInput` plus the review
+ * coordinates the worker seam can't supply: `verdict` and `reviewId` are caller-supplied
+ * (the same "pure core" stance as `at`), since deriving a verdict from model output is the
+ * #31 model-worker slice, not this guard. The worker's text becomes the review notes.
+ */
+export interface DispatchReviewInput {
+  ledger: RoomLedger
+  worker: AgentWorker
+  roomId: string
+  participant: Participant
+  taskId: string
+  prompt: string
+  reviewId: string
+  verdict: ReviewVerdict
+  at: string
+}
+
+/**
+ * Reviewer dispatch with a no-self-review guard. Before any worker call or recorded review,
+ * the no-self-review rule is CONSUMED from doctrine (`canReview`): the rule lives in one
+ * place — a reviewer may review only if they are a known participant holding the reviewer
+ * role and are not the task's implementer. A failing check refuses the dispatch (throws)
+ * with no worker invocation and no recorded output. Otherwise it runs the worker in the
+ * reviewer role and records the review via the M6a dispatch spine.
+ */
+export async function dispatchReview(input: DispatchReviewInput): Promise<RoomState> {
+  const { ledger, worker, roomId, participant, taskId, prompt, reviewId, verdict, at } = input
+  const state = await ledger.getState(roomId)
+  if (state === null)
+    throw new Error(`room "${roomId}" has no state`)
+  if (!canReview(state, taskId, participant.id))
+    throw new Error(`"${participant.id}" may not review task "${taskId}" (no self-review)`)
+
+  const output = await worker({ role: 'reviewer', prompt })
+  return ledger.recordReview(
+    roomId,
+    { id: reviewId, taskId, reviewerId: participant.id, verdict, notes: output.text, createdAt: at },
     at,
   )
 }

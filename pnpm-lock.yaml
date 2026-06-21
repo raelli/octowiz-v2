@@ -75,6 +75,9 @@ importers:
 
   packages/agent-runtime:
     dependencies:
+      '@octowiz/doctrine':
+        specifier: workspace:*
+        version: link:../doctrine
       '@octowiz/room-ledger':
         specifier: workspace:*
         version: link:../room-ledger
