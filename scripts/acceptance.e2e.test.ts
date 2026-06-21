@@ -115,24 +115,33 @@ describe('acceptance: all 10 MVP features compose in one run', () => {
     expect(calls.some(([cmd, args]) => cmd === 'pnpm' && args.includes('check'))).toBe(true)
     expect(state.validations.at(-1)?.status).toBe('passed')
 
-    // F7: a separate reviewer (≠ implementer) recorded an approval.
+    // F7: a separate reviewer (≠ implementer) recorded an approval. Assert the review exists
+    // first so the ≠-implementer check below isn't vacuously true on an absent review.
+    expect(state.reviews[0]).toBeDefined()
     expect(state.reviews[0]).toMatchObject({ reviewerId: 'rev-1', verdict: 'approved' })
     expect(state.reviews[0]?.reviewerId).not.toBe(state.tasks.find(t => t.id === taskId)?.implementerId)
+
+    // The approved path did NOT escalate.
+    expect(state.escalations).toEqual([])
 
     // F9: a GitHub-ready PR opened — gh create argv recorded AND the URL printed.
     expect(calls.some(([cmd, args]) => cmd === 'gh' && args.includes('create'))).toBe(true)
     expect(log).toHaveBeenCalledWith(expect.stringContaining('pull/123'))
-    log.mockRestore()
 
     // F10: the web server route is a thin wrapper over RoomLedger.getState — read the SAME
     // projection it reads (a fresh ledger over the same dir) and assert it equals the CLI's
     // final RoomState. Projection-equality proves the web reads the same state, no Nuxt boot.
     const webState = await new RoomLedger(new FileLedgerStore(root)).getState(roomId)
     expect(webState).toEqual(state)
+    // Also exercise the real `status` subcommand (not just the run-task return): its projection
+    // must equal the web's getState — proving the status path reads the same state the web does.
+    const statusState = await runCli(['status', '--room', roomId], deps)
+    expect(statusState).toEqual(webState)
+    log.mockRestore()
   }, 30_000)
 
   it('feature 8: a rejected review escalates to ÆLLI and stops before delivery', async () => {
-    const { ledger, deps } = await fixture()
+    const { ledger, deps, calls } = await fixture()
     const created = await runCli(['create-room', '--name', 'M11'], deps)
     const roomId = created.room.id
     const withTask = await runCli(['create-task', '--room', roomId, '--title', 'Wire it up'], deps)
@@ -163,5 +172,7 @@ describe('acceptance: all 10 MVP features compose in one run', () => {
     expect(state.tasks.find(t => t.id === taskId)?.status).not.toBe('merged')
     const after = await ledger.getState(roomId)
     expect(after?.tasks.find(t => t.id === taskId)?.status).not.toBe('merged')
+    // Delivery was truly skipped — no `gh ... create` call was ever recorded.
+    expect(calls.some(([cmd, args]) => cmd === 'gh' && args.includes('create'))).toBe(false)
   }, 30_000)
 })

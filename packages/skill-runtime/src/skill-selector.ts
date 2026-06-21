@@ -2,9 +2,11 @@ import type { Skill, WorkflowStage } from './skill-registry'
 
 // Task context the selector matches skills against. `stage` is the operative axis
 // today (registry triggers are all empty); role/taskType/repoStack are optional
-// forward-compatible narrowing signals.
+// forward-compatible narrowing signals. `stage` is a concrete workflow step you're
+// AT (never 'all') — 'all' is the cross-cutting marker on a SKILL, not a step, and
+// passing it here would select only 'all'-tagged skills, the opposite of "everything".
 export interface SkillContext {
-  stage: WorkflowStage
+  stage: Exclude<WorkflowStage, 'all'>
   role?: string[]
   taskType?: string[]
   repoStack?: string[]
