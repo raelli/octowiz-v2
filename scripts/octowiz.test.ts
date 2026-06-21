@@ -37,16 +37,37 @@ describe('start', () => {
   })
 })
 
-describe('validate', () => {
-  it('records a Validation to the ledger', async () => {
+describe('create-task', () => {
+  it('creates an open task in the room', async () => {
     const { ledger, now, run } = await fixture()
     const created = await runCli(['create-room', '--name', 'Demo'], { ledger, run, now })
     const roomId = created.room.id
-    await ledger.createTask({ id: 'task1', roomId, title: 'T', status: 'open' }, now())
-    await runCli(['validate', '--room', roomId, '--task', 'task1'], { ledger, run, now })
+    const state = await runCli(['create-task', '--room', roomId, '--title', 'Wire it up'], { ledger, run, now })
+    expect(state.tasks).toHaveLength(1)
+    expect(state.tasks[0]).toMatchObject({ title: 'Wire it up', status: 'open', roomId })
+  })
+})
+
+describe('validate', () => {
+  it('records a Validation to the ledger for an existing task', async () => {
+    const { ledger, now, run } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], { ledger, run, now })
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], { ledger, run, now })
+    const taskId = withTask.tasks[0]!.id
+    await runCli(['validate', '--room', roomId, '--task', taskId], { ledger, run, now })
     const after = await ledger.getState(roomId)
     expect(after?.validations).toHaveLength(1)
     expect(after?.validations[0]?.status).toBe('passed')
+  })
+
+  it('fails fast on an unknown task without running any checks', async () => {
+    const { ledger, now, run } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], { ledger, run, now })
+    const roomId = created.room.id
+    await expect(runCli(['validate', '--room', roomId, '--task', 'ghost'], { ledger, run, now })).rejects.toThrow(/ghost/)
+    // The expensive check suite must not have run before the guaranteed failure.
+    expect(run).not.toHaveBeenCalled()
   })
 })
 
