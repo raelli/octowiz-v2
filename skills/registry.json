@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "0.1.0",
+  "skills": [
+    {
+      "id": "role-separation",
+      "origin": "native",
+      "workflowStage": "review",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "no-self-review",
+      "origin": "native",
+      "workflowStage": "review",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "adversarial-review",
+      "origin": "native",
+      "workflowStage": "review",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "validation-loop",
+      "origin": "native",
+      "workflowStage": "validate",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "aelli-escalation",
+      "origin": "native",
+      "workflowStage": "escalate",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "ledger-recording",
+      "origin": "native",
+      "workflowStage": "all",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "sandbox-policy",
+      "origin": "native",
+      "workflowStage": "all",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "task-planning",
+      "origin": "external",
+      "workflowStage": "plan",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "brainstorming",
+      "origin": "external",
+      "workflowStage": "plan",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "test-driven-development",
+      "origin": "external",
+      "workflowStage": "implement",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "systematic-debugging",
+      "origin": "external",
+      "workflowStage": "implement",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "code-review",
+      "origin": "external",
+      "workflowStage": "review",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    },
+    {
+      "id": "github-delivery",
+      "origin": "external",
+      "workflowStage": "deliver",
+      "triggers": {
+        "taskType": [],
+        "repoStack": [],
+        "role": [],
+        "workflowStep": [],
+        "filePaths": [],
+        "validationFailures": [],
+        "roomPolicy": []
+      }
+    }
+  ]
+}
