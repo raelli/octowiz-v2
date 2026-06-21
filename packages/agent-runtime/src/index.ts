@@ -131,3 +131,44 @@ export async function dispatchReview(input: DispatchReviewInput): Promise<RoomSt
     at,
   )
 }
+
+/**
+ * The injected exec seam, identical in shape to sandbox-runtime's `Run`: a single function the
+ * caller supplies to shell out to a binary. Redefined locally — same as every other adapter
+ * (`zellij-adapter`, `github-adapter`, `validation`) — so agent-runtime takes no dependency on
+ * another package just for a type. Faked in tests; the real exec is wired at the composition root.
+ */
+export type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
+
+/**
+ * How to invoke the local model CLI. Unlike podman/docker there is no canonical binary name, so
+ * the `command` is caller-supplied. `args` are fixed leading flags (e.g. `['--model', 'q4']`)
+ * placed ahead of the per-dispatch `--role`/`--prompt`.
+ */
+export interface LocalModelWorkerConfig {
+  command: string
+  args?: readonly string[]
+}
+
+/**
+ * A concrete `AgentWorker` backed by a local model CLI, the local-model analogue of
+ * `createPodmanProvider`/`createDockerProvider`: it builds the argv, shells out through the
+ * injected `Run`, and maps the process output to `AgentOutput`. A thin seam — no model download,
+ * lifecycle, or process management, and no real model or network (tests inject a stub `Run`).
+ *
+ * `Run` has no stdin, so the prompt and role both travel through argv as `--role`/`--prompt`.
+ * A non-zero exit throws with the captured stderr (sandbox-runtime's error discipline); an empty
+ * stdout on a clean exit also throws rather than recording an empty agent output downstream.
+ */
+export function createLocalModelWorker(run: Run, config: LocalModelWorkerConfig): AgentWorker {
+  const { command, args = [] } = config
+  return async ({ role, prompt }) => {
+    const r = await run(command, [...args, '--role', role, '--prompt', prompt])
+    if (r.code !== 0)
+      throw new Error(`local model worker "${command}" exited ${r.code}: ${r.stderr}`)
+    const text = r.stdout.trim()
+    if (text === '')
+      throw new Error(`local model worker "${command}" produced no output`)
+    return { text }
+  }
+}
