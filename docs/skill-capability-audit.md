@@ -60,12 +60,32 @@ Each approved skill is one of two origins:
   `test-driven-development`, `systematic-debugging`, `code-review`,
   `github-delivery`.
 
+Note on counts: of the 7 native doctrine skills, the "always in effect"
+cross-cutting subset is a deliberate 4 (`role-separation`, `no-self-review`,
+`ledger-recording`, `sandbox-policy`) — these apply at every stage regardless of
+trigger, while the other 3 native skills (`adversarial-review`, `validation-loop`,
+`aelli-escalation`) are stage-specific. `sandbox-policy` is additionally its own
+top precedence layer (see `docs/skill-composition-strategy.md`), so the
+conflict-resolution doctrine layer lists 6. These views (7 / 6 / 4) describe the
+same native set from different angles.
+
 ## Registry Shape (descriptive only)
 
-The M7b runtime (#25) will add `skills/registry.json`. This document does not
-create it. Its intended shape, per skill: `id`, `origin` (`native` | `external`),
-`workflowStage`, and the trigger signals from `docs/packages.md` (task type, repo
-stack, role, workflow step, file paths, validation failures, room policy). The
+There are two distinct artifacts, and they are not the same thing:
+
+- **`skills/registry.json`** — the registry **data**: the single source-of-truth
+  list of approved skills (per `docs/mvp.md` §M7 / Milestone 7).
+- **`skill-registry.ts`** — the typed **loader/accessor** over that data, living in
+  `packages/skill-runtime` (per `docs/packages.md`). It reads, validates, and
+  exposes the registry data.
+
+The M7b runtime (#25) adds both. This document creates neither. The intended shape
+of each `skills/registry.json` entry: `id`, `origin` (`native` | `external`),
+`workflowStage`, and the trigger-signal fields from `docs/packages.md` (task type,
+repo stack, role, workflow step, file paths, validation failures, room policy).
+The concrete trigger-signal vocabulary and per-skill mapping are defined later,
+when the matcher slice is built (see `docs/skill-composition-strategy.md`); #25
+loads, validates, and exposes the registry without matching on those signals. The
 registry must contain exactly the skills approved above and no others.
 
 ## Out of Scope
