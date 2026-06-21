@@ -19,10 +19,11 @@ import { defaultReadFile, loadApprovedSkills, selectSkills } from '@octowiz/skil
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 import { gitDiff } from './git-diff'
+import { orchestrate } from './orchestrate'
 
 type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
 
-interface Deps {
+export interface Deps {
   ledger: RoomLedger
   run: Run
   now: () => string
@@ -264,8 +265,22 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const created = await runCli(['create-room', '--name', name], deps)
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
+    case 'run-task': {
+      // Thin glue: hand the parsed flags to orchestrate, which chains the subcommands via
+      // runCli so they stay the single source of truth. --base/--verdict are optional.
+      return orchestrate({
+        room: flag(values, 'room'),
+        task: flag(values, 'task'),
+        agent: flag(values, 'agent'),
+        reviewer: flag(values, 'reviewer'),
+        repo: flag(values, 'repo'),
+        branch: flag(values, 'branch'),
+        base: values.base as string | undefined,
+        verdict: values.verdict as ReviewVerdict | undefined,
+      }, deps, runCli)
+    }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills | deliver)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills | deliver | run-task)`)
   }
 }
 
