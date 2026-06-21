@@ -36,13 +36,18 @@ export function isMergeReady(state: RoomState, taskId: string): MergeReadiness {
 
   const reasons: string[] = []
 
-  // A merged or blocked task is not a merge candidate regardless of validation and
-  // approvals. Only these two statuses are terminal here — the positive prerequisites
-  // (validation, approval) are checked separately, so we don't require a specific status.
+  // Fail closed on lifecycle status: only a task that has been submitted for review
+  // (in_review or validated) is a merge candidate. Validation and an approving review are
+  // necessary but NOT sufficient — the reducer records validation.recorded/review.recorded
+  // for ANY existing task, so an open, in-progress, or reopened task could otherwise carry
+  // a passing validation + approval and read as merge-ready. Distinct messages for the
+  // terminal statuses; a generic "not in review" for the not-yet-submitted ones.
   if (task.status === 'merged')
     reasons.push('task already merged')
   else if (task.status === 'blocked')
     reasons.push('task is blocked')
+  else if (task.status !== 'in_review' && task.status !== 'validated')
+    reasons.push(`task is not in review (status: ${task.status})`)
 
   // An unassigned task has no work to merge — and without an implementer, canReview's
   // self-review exclusion is vacuous, so require assignment explicitly.

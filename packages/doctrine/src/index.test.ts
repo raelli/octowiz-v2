@@ -93,6 +93,37 @@ describe('isMergeReady', () => {
     expect(result.reasons).toContain('task is blocked')
   })
 
+  it('is not ready when the task is still open, even with passing validation and approval', () => {
+    // Fail closed: an open task was never submitted for review. The reducer will record
+    // validation/review for any existing task, so these prerequisites alone must not make
+    // an un-submitted task merge-ready.
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'open', implementerId: 'impl' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('task is not in review (status: open)')
+  })
+
+  it('is not ready when the task is only in progress (e.g. reopened for more work)', () => {
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'in_progress', implementerId: 'impl' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('task is not in review (status: in_progress)')
+  })
+
+  it('is ready when a validated task has a passing validation and approval', () => {
+    const state = baseState()
+    state.tasks = [{ id: 'tk1', roomId: 'r1', title: 'Do it', status: 'validated', implementerId: 'impl' }]
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: 't2' })
+    expect(isMergeReady(state, 'tk1')).toEqual({ ready: true, reasons: [] })
+  })
+
   it('is not ready when a reviewer approves then later requests changes', () => {
     const state = baseState()
     state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
