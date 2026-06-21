@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import { buildEscalationRequest, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
 import { createLocalModelWorker } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
@@ -65,7 +66,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, aelliClient, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -125,6 +126,20 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       const validation = await runValidation(taskId, checks, run, now())
       return ledger.recordValidation(roomId, validation, now())
     }
+    case 'escalate': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      // Escalation is conditional: only pull in ÆLLI when a trigger actually fired
+      // (failed validation, a rejection, or a block). Otherwise leave the room untouched.
+      const decision = shouldEscalate(state, taskId)
+      if (!decision.escalate)
+        return state
+      const request = buildEscalationRequest(state, taskId)
+      return recordAelliEscalation(ledger, aelliClient, request, { id: `esc-${roomId}-${taskId}-${now()}`, at: now() })
+    }
     case 'status': {
       const roomId = flag(values, 'room')
       const state = await ledger.getState(roomId)
@@ -140,7 +155,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | escalate | status | up)`)
   }
 }
 
