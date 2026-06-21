@@ -91,6 +91,59 @@ describe('validate', () => {
   })
 })
 
+describe('assign', () => {
+  it('registers the implementer participant, assigns the task, and sets in_progress', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    const state = await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], deps)
+    expect(state.participants).toContainEqual({ id: 'impl-1', kind: 'agent', roles: ['implementer'], displayName: 'impl-1' })
+    const after = await ledger.getState(roomId)
+    expect(after?.tasks[0]?.implementerId).toBe('impl-1')
+    expect(after?.tasks[0]?.status).toBe('in_progress')
+  })
+
+  it('is idempotent on the participant when the agent is already registered', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const t1 = await runCli(['create-task', '--room', roomId, '--title', 'A'], deps)
+    await runCli(['assign', '--room', roomId, '--task', t1.tasks[0]!.id, '--agent', 'impl-1'], deps)
+    const t2 = await runCli(['create-task', '--room', roomId, '--title', 'B'], deps)
+    const taskId = t2.tasks.find(t => t.title === 'B')!.id
+    const state = await runCli(['assign', '--room', roomId, '--task', taskId, '--agent', 'impl-1'], deps)
+    expect(state.participants.filter(p => p.id === 'impl-1')).toHaveLength(1)
+  })
+})
+
+describe('validate status advance', () => {
+  it('advances a passing task to validated', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    await runCli(['validate', '--room', roomId, '--task', taskId], deps)
+    const after = await ledger.getState(roomId)
+    expect(after?.tasks[0]?.status).toBe('validated')
+  })
+
+  it('leaves a failing task\'s status unchanged', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    // A non-zero check exit makes the validation fail; status must stay put for escalate later.
+    const failing = { ...deps, run: vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'boom' }) }
+    const state = await runCli(['validate', '--room', roomId, '--task', taskId], failing)
+    expect(state.validations[0]?.status).toBe('failed')
+    expect(state.tasks[0]?.status).toBe('open')
+  })
+})
+
 describe('up', () => {
   it('creates a room, a sandbox, and starts its sessions in one command', async () => {
     const { deps } = await fixture()

@@ -74,6 +74,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       repo: { type: 'string' },
       task: { type: 'string' },
       title: { type: 'string' },
+      agent: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -114,6 +115,19 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       await runInSession(roomId, startArgs(repo, { title: `Room ${roomId}` }), run)
       return ledger.recordSessionStart(roomId, 'opencode', name, now())
     }
+    case 'assign': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const agentId = flag(values, 'agent')
+      // The task.assigned reducer rejects an unknown implementer, so the participant MUST
+      // exist before assignTask. Register idempotently: re-running assign for the same agent
+      // (e.g. a second task) must not duplicate the participant.
+      const state = await ledger.getState(roomId)
+      if (state !== null && !state.participants.some(p => p.id === agentId))
+        await ledger.addParticipant(roomId, { id: agentId, kind: 'agent', roles: ['implementer'], displayName: agentId }, now())
+      await ledger.assignTask(roomId, taskId, agentId, now())
+      return ledger.setTaskStatus(roomId, taskId, 'in_progress', now())
+    }
     case 'validate': {
       const roomId = flag(values, 'room')
       const taskId = flag(values, 'task')
@@ -123,7 +137,11 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       if (state === null || !state.tasks.some(t => t.id === taskId))
         throw new Error(`task "${taskId}" not found in room "${roomId}"`)
       const validation = await runValidation(taskId, checks, run, now())
-      return ledger.recordValidation(roomId, validation, now())
+      const recorded = await ledger.recordValidation(roomId, validation, now())
+      // Advance only on pass; a failure leaves the status put so escalate can later trigger on it.
+      if (validation.status === 'passed')
+        return ledger.setTaskStatus(roomId, taskId, 'validated', now())
+      return recorded
     }
     case 'status': {
       const roomId = flag(values, 'room')
@@ -140,7 +158,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | assign | validate | status | up)`)
   }
 }
 
