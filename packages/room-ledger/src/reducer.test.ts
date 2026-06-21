@@ -47,6 +47,18 @@ describe('applyEvent', () => {
     expect(state.sessions).toEqual([{ tool: 'zellij', sessionName: 'octowiz-r1', at: 't1' }])
   })
 
+  it('initializes sandboxes to empty on room.created', () => {
+    expect(applyEvent(null, created).sandboxes).toEqual([])
+  })
+
+  it('appends a sandbox on sandbox.started', () => {
+    const state = applyEvents([
+      created,
+      { type: 'sandbox.started', at: 't1', roomId: 'r1', provider: 'podman', sandboxId: 'abc123' },
+    ])!
+    expect(state.sandboxes).toEqual([{ provider: 'podman', sandboxId: 'abc123', at: 't1' }])
+  })
+
   it('returns null for an empty event log', () => {
     expect(applyEvents([])).toBeNull()
   })
@@ -116,6 +128,12 @@ describe('applyEvent invariants', () => {
   it('rejects a session.started whose roomId does not match the room', () => {
     expect(() => applyEvents(join(
       { type: 'session.started', at: 't1', roomId: 'other', tool: 'zellij', sessionName: 'octowiz-other' },
+    ))).toThrow()
+  })
+
+  it('rejects a sandbox.started whose roomId does not match the room', () => {
+    expect(() => applyEvents(join(
+      { type: 'sandbox.started', at: 't1', roomId: 'other', provider: 'podman', sandboxId: 'abc123' },
     ))).toThrow()
   })
 
