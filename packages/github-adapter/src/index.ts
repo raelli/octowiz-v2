@@ -1,3 +1,6 @@
+import type { RoomState } from '@octowiz/schemas'
+import { isMergeReady } from '@octowiz/doctrine'
+
 export type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
 
 /**
@@ -69,4 +72,78 @@ export interface BranchPullRequestOptions {
 export async function openPullRequestForBranch(opts: BranchPullRequestOptions, run: Run): Promise<string> {
   await createBranch(opts.branch, run)
   return openPullRequest({ head: opts.branch, base: opts.base, title: opts.title, body: opts.body }, run)
+}
+
+/** Render the validation section: the checks of the LATEST validation for the task. */
+function renderValidation(state: RoomState, taskId: string): string {
+  // "Latest" must mean the same validation isMergeReady judges (`filter(...).at(-1)`),
+  // otherwise the body could show all-green checks while merge-readiness reports a failure.
+  const latest = state.validations.filter(v => v.taskId === taskId).at(-1)
+  if (latest === undefined)
+    return '## Validation\n\nNo validation has run for this task.'
+  if (latest.checks.length === 0)
+    return `## Validation\n\nOverall: **${latest.status}** (no individual checks recorded).`
+  const rows = latest.checks
+    .map(c => `- ${c.status === 'passed' ? '✅' : '❌'} \`${c.name}\` — ${c.status}`)
+    .join('\n')
+  return `## Validation\n\nOverall: **${latest.status}**\n\n${rows}`
+}
+
+/** Render the review section: the LATEST verdict per reviewer, in first-seen order. */
+function renderReview(state: RoomState, taskId: string): string {
+  // Match isMergeReady's "latest verdict per reviewer" so the summary cannot contradict
+  // merge-readiness. A Map preserves first-seen insertion order on overwrite, keeping the
+  // output deterministic for a given input array.
+  const latestByReviewer = new Map<string, string>()
+  for (const r of state.reviews) {
+    if (r.taskId === taskId)
+      latestByReviewer.set(r.reviewerId, r.verdict)
+  }
+  if (latestByReviewer.size === 0)
+    return '## Review\n\nNo review has been recorded for this task.'
+  const rows = [...latestByReviewer]
+    .map(([reviewerId, verdict]) => {
+      const reviewer = state.participants.find(p => p.id === reviewerId)
+      const who = reviewer === undefined ? reviewerId : `${reviewer.displayName} (\`${reviewerId}\`)`
+      return `- ${who} — **${verdict}**`
+    })
+    .join('\n')
+  return `## Review\n\n${rows}`
+}
+
+/** Render the merge-readiness section straight from `doctrine.isMergeReady`. */
+function renderMergeReadiness(state: RoomState, taskId: string): string {
+  // Consume doctrine — never reimplement the merge-readiness rules here. Render the
+  // `ready` flag and every unmet `reason` it returns.
+  const { ready, reasons } = isMergeReady(state, taskId)
+  if (ready)
+    return '## Merge readiness\n\n✅ **Ready to merge.** All conditions are satisfied.'
+  const rows = reasons.map(reason => `- ❌ ${reason}`).join('\n')
+  return `## Merge readiness\n\n🚫 **Not ready to merge.** Unmet conditions:\n\n${rows}`
+}
+
+/**
+ * Generate a deterministic pull-request body (markdown) summarising a task's delivery
+ * state: a validation summary (the latest validation's per-check pass/fail results), a
+ * review summary (the latest verdict per reviewer), and an explicit merge-readiness
+ * section rendered from `doctrine.isMergeReady` — the `ready` flag plus its `reasons`.
+ *
+ * Pure: derives solely from the supplied in-memory state, with no `Run`, I/O, or network,
+ * so it is unit-testable with plain-data fixtures. For an unknown task it still produces a
+ * valid body whose merge-readiness section carries doctrine's "task not found" reason.
+ *
+ * @param state The projected room state to read tasks, validations, and reviews from.
+ * @param taskId The id of the task to summarise.
+ * @returns The pull-request body as markdown.
+ */
+export function generatePullRequestBody(state: RoomState, taskId: string): string {
+  const task = state.tasks.find(t => t.id === taskId)
+  const title = task === undefined ? taskId : task.title
+  const header = `# ${title}\n\nTask \`${taskId}\` in room **${state.room.name}**.`
+  return [
+    header,
+    renderValidation(state, taskId),
+    renderReview(state, taskId),
+    renderMergeReadiness(state, taskId),
+  ].join('\n\n')
 }
