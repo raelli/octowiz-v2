@@ -70,6 +70,21 @@ describe('isMergeReady', () => {
     expect(isMergeReady(state, 'tk1')).toEqual({ ready: true, reasons: [] })
   })
 
+  // Contract regression (#9): "latest verdict" follows ledger APPEND order, not `createdAt`.
+  // The reducer doesn't enforce createdAt monotonicity, so a replayed/skewed approval can
+  // carry a newer timestamp than the rejection that truly came after it. A later-appended
+  // changes_requested must still win, even though the earlier-appended approval has the
+  // newer createdAt — otherwise a stale approval could silently re-enable merge.
+  it('uses ledger append order, not createdAt, for the latest verdict', () => {
+    const state = baseState()
+    state.validations.push({ id: 'v1', taskId: 'tk1', status: 'passed', checks: [], createdAt: 't1' })
+    state.reviews.push({ id: 'rv1', taskId: 'tk1', reviewerId: 'rev', verdict: 'approved', createdAt: '2026-01-02T00:00:00Z' })
+    state.reviews.push({ id: 'rv2', taskId: 'tk1', reviewerId: 'rev', verdict: 'changes_requested', createdAt: '2026-01-01T00:00:00Z' })
+    const result = isMergeReady(state, 'tk1')
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('no approving review from a qualified reviewer')
+  })
+
   it('reports an unknown task', () => {
     expect(isMergeReady(baseState(), 'nope')).toEqual({ ready: false, reasons: ['task "nope" not found'] })
   })
