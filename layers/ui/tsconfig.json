@@ -1,0 +1,10 @@
+{
+  "extends": "../../packages/config-typescript/vue-nuxt.json",
+  "compilerOptions": {
+    // nuxt.config.ts uses node:url / import.meta.url.
+    "types": ["node"]
+  },
+  // Plain `tsc` only checks the layer config here; the .vue components are type-checked by
+  // the app's vue-tsc once Nuxt composes the layers (tsc cannot parse SFCs on its own).
+  "include": ["nuxt.config.ts"]
+}

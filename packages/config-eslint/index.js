@@ -18,6 +18,11 @@ export default function octowiz(options = {}, ...userConfigs) {
       // devDep) and would make antfu globally ignore every .ts file — silently turning
       // the boundary rule below into a no-op. Pinning it true keeps .ts files linted.
       typescript: true,
+      // Force Vue on for the same reason as typescript: antfu auto-detects Vue via
+      // isPackageExists('vue'), which is false at the monorepo root (vue lives only in the
+      // web app), so .vue files in apps/layers would be silently skipped. Pinning it true
+      // keeps the Nuxt/Vue surfaces linted.
+      vue: true,
       jsonc: false,
       yaml: false,
       markdown: false,

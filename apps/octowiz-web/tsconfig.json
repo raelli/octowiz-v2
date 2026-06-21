@@ -1,0 +1,5 @@
+{
+  // Nuxt generates .nuxt/tsconfig.*.json on `nuxt prepare`; extend the app one so paths,
+  // auto-imports, and layer aliases resolve during type-check.
+  "extends": "./.nuxt/tsconfig.app.json"
+}
