@@ -1,0 +1,5 @@
+{
+  "name": "octowiz-validate-fixture",
+  "private": true,
+  "scripts": { "check": "node -e \"process.exit(0)\"" }
+}
