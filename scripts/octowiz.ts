@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
+import { buildEscalationRequest, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
 import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
@@ -66,7 +67,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, worker, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, worker, aelliClient, checks = DEFAULT_CHECKS } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -77,6 +78,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       task: { type: 'string' },
       title: { type: 'string' },
       verdict: { type: 'string' },
+      agent: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -117,6 +119,32 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       await runInSession(roomId, startArgs(repo, { title: `Room ${roomId}` }), run)
       return ledger.recordSessionStart(roomId, 'opencode', name, now())
     }
+    case 'assign': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const agentId = flag(values, 'agent')
+      // The task.assigned reducer rejects an unknown implementer, so the participant MUST
+      // exist before assignTask. Register idempotently: re-running assign for the same agent
+      // (e.g. a second task) must not duplicate the participant. But the reducer only checks
+      // existence, not role — so guard role-awareness here: a same-id participant that isn't an
+      // agent implementer must fail loudly, because the ledger has no role-update event to
+      // promote it (addParticipant would just throw a confusing "duplicate participant id").
+      // Fail fast: assignTask would write an orphan participant.joined event before its
+      // reducer rejects an unknown task, and an unknown room throws a cryptic "first event
+      // must be room.created" — so verify the room and task exist first.
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      if (!state.tasks.some(t => t.id === taskId))
+        throw new Error(`task "${taskId}" not found in room "${roomId}"`)
+      const existing = state.participants.find(p => p.id === agentId)
+      if (existing !== undefined && (existing.kind !== 'agent' || !existing.roles.includes('implementer')))
+        throw new Error(`cannot assign task "${taskId}": participant "${agentId}" already exists without the agent implementer role (the room ledger has no role-update event)`)
+      if (existing === undefined)
+        await ledger.addParticipant(roomId, { id: agentId, kind: 'agent', roles: ['implementer'], displayName: agentId }, now())
+      await ledger.assignTask(roomId, taskId, agentId, now())
+      return ledger.setTaskStatus(roomId, taskId, 'in_progress', now())
+    }
     case 'validate': {
       const roomId = flag(values, 'room')
       const taskId = flag(values, 'task')
@@ -126,21 +154,47 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       if (state === null || !state.tasks.some(t => t.id === taskId))
         throw new Error(`task "${taskId}" not found in room "${roomId}"`)
       const validation = await runValidation(taskId, checks, run, now())
-      return ledger.recordValidation(roomId, validation, now())
+      const recorded = await ledger.recordValidation(roomId, validation, now())
+      // Advance only on pass; a failure leaves the status put so escalate can later trigger on it.
+      if (validation.status === 'passed')
+        return ledger.setTaskStatus(roomId, taskId, 'validated', now())
+      return recorded
+    }
+    case 'escalate': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room "${roomId}" not found`)
+      // Escalation is conditional: only pull in ÆLLI when a trigger actually fired
+      // (failed validation, a rejection, or a block). Otherwise leave the room untouched.
+      const decision = shouldEscalate(state, taskId)
+      if (!decision.escalate)
+        return state
+      const request = buildEscalationRequest(state, taskId)
+      return recordAelliEscalation(ledger, aelliClient, request, { id: `esc-${roomId}-${taskId}-${now()}`, at: now() })
     }
     case 'review': {
       const roomId = flag(values, 'room')
       const taskId = flag(values, 'task')
       const reviewerId = flag(values, 'reviewer')
       const verdict = flag(values, 'verdict')
-      let state = await ledger.getState(roomId)
+      // Fail fast: registering the reviewer below would write an orphan participant.joined
+      // event before dispatchReview's reducer rejects an unknown task, and an unknown room
+      // throws a cryptic "first event must be room.created" — so verify both exist first.
+      const state = await ledger.getState(roomId)
       if (state === null)
         throw new Error(`room "${roomId}" not found`)
+      if (!state.tasks.some(t => t.id === taskId))
+        throw new Error(`task "${taskId}" not found in room "${roomId}"`)
       // Register the reviewer idempotently — dispatchReview's canReview gate requires a known
-      // participant holding the reviewer role, so skip re-adding one already present.
-      if (!state.participants.some(p => p.id === reviewerId))
-        state = await ledger.addParticipant(roomId, { id: reviewerId, kind: 'agent', roles: ['reviewer'], displayName: reviewerId }, now())
-      const participant = state.participants.find(p => p.id === reviewerId)!
+      // participant holding the reviewer role. The ledger has no role-update event, so a same-id
+      // participant that isn't an agent reviewer can't be promoted: fail loudly here instead of
+      // letting canReview throw a misleading "no self-review" error.
+      const existing = state.participants.find(p => p.id === reviewerId)
+      if (existing !== undefined && (existing.kind !== 'agent' || !existing.roles.includes('reviewer')))
+        throw new Error(`cannot review task "${taskId}": participant "${reviewerId}" already exists without the agent reviewer role (the room ledger has no role-update event)`)
+      const participant = existing ?? (await ledger.addParticipant(roomId, { id: reviewerId, kind: 'agent', roles: ['reviewer'], displayName: reviewerId }, now())).participants.find(p => p.id === reviewerId)!
       // Capture the implementer's working-tree diff as the reviewer prompt; '' when no repo given.
       const prompt = values.repo ? await gitDiff(values.repo, run) : ''
       return dispatchReview({
@@ -170,7 +224,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       return runCli(['start', '--room', created.room.id, '--repo', repo], deps)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | review | status | up)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review)`)
   }
 }
 
