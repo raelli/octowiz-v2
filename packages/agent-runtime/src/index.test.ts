@@ -1,10 +1,10 @@
 import type { LedgerStore } from '@octowiz/room-ledger'
 import type { LedgerEvent, Participant } from '@octowiz/schemas'
-import type { AgentWorker, Run } from './index'
+import type { AgentWorker, EscalationHandoff, Run } from './index'
 import { RoomLedger } from '@octowiz/room-ledger'
 import { ParticipantRoleSchema } from '@octowiz/schemas'
 import { describe, expect, it } from 'vitest'
-import { AGENT_ROLES, assignRole, createLocalModelWorker, dispatch, dispatchReview } from './index'
+import { AGENT_ROLES, assignRole, createLocalModelWorker, dispatch, dispatchReview, handoffEscalation } from './index'
 
 // In-memory store keeps the dispatch tests pure — no tmpdir, no filesystem. It mirrors
 // FileLedgerStore's append/read contract closely enough to drive RoomLedger end to end.
@@ -278,6 +278,146 @@ describe('dispatchReview', () => {
         at: '2026-06-21T01:00:00.000Z',
       }),
     ).rejects.toThrow()
+  })
+})
+
+// Records every handoff so its call count and the request can be asserted, and returns a
+// caller-supplied recommendation — the faked ÆLLI seam. No real ÆLLI client or network.
+function stubHandoff(recommendation: string): {
+  handoff: EscalationHandoff
+  calls: { reason: string, roomId: string, taskId: string }[]
+} {
+  const calls: { reason: string, roomId: string, taskId: string }[] = []
+  const handoff: EscalationHandoff = async (request) => {
+    calls.push(request)
+    return recommendation
+  }
+  return { handoff, calls }
+}
+
+describe('handoffEscalation', () => {
+  it('hands off through the injected seam and records the escalation when the worker fails', async () => {
+    const { ledger, advisor } = await seedRoom()
+    const worker: AgentWorker = async () => {
+      throw new Error('local model unavailable')
+    }
+    const { handoff, calls } = stubHandoff('retry on the remote model')
+
+    const state = await handoffEscalation({
+      ledger,
+      worker,
+      handoff,
+      roomId: 'r1',
+      participant: advisor,
+      taskId: 't1',
+      prompt: 'should we change the contract?',
+      at: '2026-06-21T02:00:00.000Z',
+    })
+
+    // The handoff seam was exercised once, carrying the failure as the reason.
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.reason).toMatch(/local model unavailable/)
+    expect(calls[0]?.roomId).toBe('r1')
+    expect(calls[0]?.taskId).toBe('t1')
+    // The escalation is visible in the projected room state, with the seam's recommendation.
+    expect(state.escalations).toHaveLength(1)
+    expect(state.escalations[0]?.reason).toMatch(/local model unavailable/)
+    expect(state.escalations[0]?.recommendation).toBe('retry on the remote model')
+    expect(state.escalations[0]?.taskId).toBe('t1')
+    expect(state.escalations[0]?.roomId).toBe('r1')
+  })
+
+  it('persists the recorded escalation so a re-projection still shows it', async () => {
+    const { ledger, advisor } = await seedRoom()
+    const worker: AgentWorker = async () => {
+      throw new Error('out of depth')
+    }
+    const { handoff } = stubHandoff('ask a human')
+
+    await handoffEscalation({
+      ledger,
+      worker,
+      handoff,
+      roomId: 'r1',
+      participant: advisor,
+      taskId: 't1',
+      prompt: 'help',
+      at: '2026-06-21T02:00:00.000Z',
+    })
+
+    const state = await ledger.getState('r1')
+    expect(state?.escalations.map(e => e.recommendation)).toEqual(['ask a human'])
+  })
+
+  it('passes through unchanged when the worker succeeds — no handoff, no escalation', async () => {
+    const { ledger, advisor } = await seedRoom()
+    const worker: AgentWorker = async () => ({ text: 'the model handled it' })
+    const { handoff, calls } = stubHandoff('unused')
+
+    const state = await handoffEscalation({
+      ledger,
+      worker,
+      handoff,
+      roomId: 'r1',
+      participant: advisor,
+      taskId: 't1',
+      prompt: 'is the contract sound?',
+      at: '2026-06-21T02:00:00.000Z',
+    })
+
+    // No escalation condition fired: the seam is never called and nothing is recorded.
+    expect(calls).toEqual([])
+    expect(state.escalations).toEqual([])
+  })
+
+  it('fails closed: a rejecting handoff seam records nothing and propagates', async () => {
+    const { ledger, advisor } = await seedRoom()
+    const worker: AgentWorker = async () => {
+      throw new Error('local model unavailable')
+    }
+    const handoff: EscalationHandoff = async () => {
+      throw new Error('ÆLLI is unreachable')
+    }
+
+    await expect(
+      handoffEscalation({
+        ledger,
+        worker,
+        handoff,
+        roomId: 'r1',
+        participant: advisor,
+        taskId: 't1',
+        prompt: 'p',
+        at: '2026-06-21T02:00:00.000Z',
+      }),
+    ).rejects.toThrow(/unreachable/)
+
+    // The ledger is written only after the seam answers, so a failed handoff leaves no escalation.
+    const state = await ledger.getState('r1')
+    expect(state?.escalations).toEqual([])
+  })
+
+  it('refuses to hand off for a participant that does not hold the advisor role', async () => {
+    const { ledger } = await seedRoom()
+    const worker: AgentWorker = async () => {
+      throw new Error('boom')
+    }
+    const { handoff, calls } = stubHandoff('x')
+    const implementer = assignRole({ id: 'imp', kind: 'agent', roles: [], displayName: 'Imp' }, 'implementer')
+
+    await expect(
+      handoffEscalation({
+        ledger,
+        worker,
+        handoff,
+        roomId: 'r1',
+        participant: implementer,
+        taskId: 't1',
+        prompt: 'p',
+        at: '2026-06-21T02:00:00.000Z',
+      }),
+    ).rejects.toThrow(/advisor/)
+    expect(calls).toEqual([])
   })
 })
 
