@@ -40,40 +40,55 @@ const DEFAULT_IMAGE = 'docker.io/library/alpine:latest'
 const KEEP_ALIVE = ['sleep', 'infinity']
 
 /**
- * Rootless container provider backed by `podman` (rootless is podman's default when run as
- * a non-root user — no extra flag needed). Shell-out goes through an injected `Run` so this
- * is unit-testable without a runtime; the real `defaultRun` is wired at the composition root.
+ * Container provider backed by a Docker-CLI-compatible binary. podman and docker share the
+ * exact `run -d --name … <image> <keep-alive>` / `rm -f <id>` argv, so one implementation
+ * serves both — the binary name is the only difference. Shell-out goes through an injected
+ * `Run` so this is unit-testable without a runtime; the real `defaultRun` is wired at the
+ * composition root. (podman is rootless by default as non-root; docker is not.)
  */
-export function createPodmanProvider(run: Run): SandboxProvider {
+function createContainerProvider(binary: 'podman' | 'docker', run: Run): SandboxProvider {
   return {
-    name: 'podman',
+    name: binary,
     async create(roomId, opts) {
       const args = ['run', '-d', '--name', sandboxName(roomId)]
       if (opts?.workdir !== undefined)
         args.push('--workdir', opts.workdir)
-      // ponytail: `sleep infinity` keeps the container alive as an idle sandbox. The real
-      // keep-alive against a concrete image is exercised by the M5c gated smoke; adjust here
-      // if the chosen image lacks it (single place — same pattern as the opencode argv).
       args.push(opts?.image ?? DEFAULT_IMAGE, ...KEEP_ALIVE)
-      const r = await run('podman', args)
+      const r = await run(binary, args)
       if (r.code !== 0)
-        throw new Error(`podman create failed for room ${roomId}: ${r.stderr}`)
+        throw new Error(`${binary} create failed for room ${roomId}: ${r.stderr}`)
       // `run -d` prints the container id on its own line; take the last non-empty line so a
       // stray warning on stdout cannot corrupt the id, and fail loudly on empty output rather
       // than hand back a useless handle that only breaks at destroy time.
       const id = r.stdout.trim().split('\n').map(l => l.trim()).filter(Boolean).at(-1) ?? ''
       if (id === '')
-        throw new Error(`podman create for room ${roomId} returned no container id`)
-      return { provider: 'podman', id, roomId }
+        throw new Error(`${binary} create for room ${roomId} returned no container id`)
+      return { provider: binary, id, roomId }
     },
     async destroy(handle) {
-      // Guard against a foreign handle being routed here once a factory/multi-provider path
-      // exists (M5c) — destroying by id alone would otherwise hit the wrong backend silently.
-      if (handle.provider !== 'podman')
-        throw new Error(`podman provider cannot destroy a "${handle.provider}" sandbox`)
-      const r = await run('podman', ['rm', '-f', handle.id])
+      // Guard against a foreign handle being routed to the wrong backend — destroying by id
+      // alone would otherwise silently hit (or miss) a container in a different runtime.
+      if (handle.provider !== binary)
+        throw new Error(`${binary} provider cannot destroy a "${handle.provider}" sandbox`)
+      const r = await run(binary, ['rm', '-f', handle.id])
       if (r.code !== 0)
-        throw new Error(`podman destroy failed for ${handle.id}: ${r.stderr}`)
+        throw new Error(`${binary} destroy failed for ${handle.id}: ${r.stderr}`)
     },
   }
+}
+
+export const createPodmanProvider = (run: Run): SandboxProvider => createContainerProvider('podman', run)
+export const createDockerProvider = (run: Run): SandboxProvider => createContainerProvider('docker', run)
+
+export type ProviderName = 'podman' | 'docker' | 'auto'
+
+/**
+ * Pick a sandbox provider so the room lifecycle is not bound to one backend. An explicit
+ * name forces that provider. ponytail: `auto` resolves to podman — the MVP rootless default
+ * — without probing the host (that needs a real exec at the composition root). When host
+ * probing is wanted, run `<bin> info` (daemon-reachable, as the gated smoke does) there and
+ * pass the winning name explicitly; a `--provider` CLI flag can follow when M6 needs it.
+ */
+export function selectProvider(name: ProviderName, run: Run): SandboxProvider {
+  return name === 'docker' ? createDockerProvider(run) : createPodmanProvider(run)
 }

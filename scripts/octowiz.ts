@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { startArgs } from '@octowiz/opencode-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
-import { createPodmanProvider } from '@octowiz/sandbox-runtime'
+import { selectProvider } from '@octowiz/sandbox-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
 import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 
@@ -134,7 +134,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
   const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
-  const provider = createPodmanProvider(defaultRun)
+  const provider = selectProvider('auto', defaultRun)
   runCli(argv, { ledger, run: defaultRun, now: () => new Date().toISOString(), provider })
     .then((state) => {
       // `status` already printed its projection; for mutating commands, echo the room id
