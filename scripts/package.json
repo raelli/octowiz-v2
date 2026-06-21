@@ -1,0 +1,25 @@
+{
+  "name": "@octowiz/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "octowiz": "tsx octowiz.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@octowiz/opencode-adapter": "workspace:*",
+    "@octowiz/room-ledger": "workspace:*",
+    "@octowiz/schemas": "workspace:*",
+    "@octowiz/validation": "workspace:*",
+    "@octowiz/zellij-adapter": "workspace:*",
+    "tsx": "catalog:"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -29,4 +29,11 @@ describe('roomLedger preflight', () => {
     const state = await ledger.getState('r1')
     expect(state!.tasks).toEqual([])
   })
+
+  it('records a session start', async () => {
+    const ledger = await freshLedger()
+    await ledger.createRoom({ id: 'r1', name: 'Room', status: 'active', createdAt: 't0' }, 't0')
+    const state = await ledger.recordSessionStart('r1', 'zellij', 'octowiz-r1', 't1')
+    expect(state.sessions).toEqual([{ tool: 'zellij', sessionName: 'octowiz-r1', at: 't1' }])
+  })
 })

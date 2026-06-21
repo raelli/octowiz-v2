@@ -2,12 +2,14 @@ packages:
   - "apps/*"
   - "layers/*"
   - "packages/*"
+  - "scripts"
   - "skills/*"
 
 catalog:
   "@antfu/eslint-config": ^9.0.0
   "@types/node": ^22.0.0
   eslint: ^10.5.0
+  tsx: ^4.0.0
   typescript: ^6.0.3
   vitest: ^4.1.9
   zod: ^4.4.0
@@ -21,6 +23,10 @@ catalog:
 allowBuilds:
   # simple-git-hooks' postinstall installs our git hooks — vetted and allowed.
   simple-git-hooks: true
+  # esbuild (via tsx, the CLI's TS runner) downloads its platform binary on install —
+  # vetted and allowed. tsx runs scripts/octowiz.ts since the workspace uses extensionless
+  # TS imports that node's ESM resolver can't load directly.
+  esbuild: true
 #
 # Wait 24h before installing a newly published version (catch compromised releases).
 minimumReleaseAge: 1440

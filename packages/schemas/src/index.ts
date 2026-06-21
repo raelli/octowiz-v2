@@ -94,6 +94,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('review.recorded'), at: z.string().min(1), review: ReviewSchema }),
   z.object({ type: z.literal('validation.recorded'), at: z.string().min(1), validation: ValidationSchema }),
   z.object({ type: z.literal('escalation.recorded'), at: z.string().min(1), escalation: EscalationSchema }),
+  z.object({ type: z.literal('session.started'), at: z.string().min(1), roomId: z.string().min(1), tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1) }),
 ])
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>
 
@@ -101,8 +102,10 @@ export type LedgerEvent = z.infer<typeof LedgerEventSchema>
 // written under, so a reader can detect and reject (or later migrate) older logs at the
 // trust boundary. A version mismatch fails the `schemaVersion` literal on parse.
 //
-// ponytail: only 0.1.0 exists, so a mismatch is rejected outright. When a second version
-// ships, widen `schemaVersion` to a union and route old envelopes through a migration.
+// ponytail: only 0.1.0 exists. Additive event variants (new union members like
+// session.started) ride the current version — old ledgers still validate, so no bump.
+// A version mismatch is rejected outright; when a genuinely breaking change ships, widen
+// `schemaVersion` to a union and route old envelopes through a migration.
 export const StoredLedgerEventSchema = z.object({
   schemaVersion: z.literal(SCHEMAS_VERSION),
   event: LedgerEventSchema,
@@ -118,5 +121,6 @@ export const RoomStateSchema = z.object({
   reviews: z.array(ReviewSchema),
   validations: z.array(ValidationSchema),
   escalations: z.array(EscalationSchema),
+  sessions: z.array(z.object({ tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1), at: z.string().min(1) })),
 })
 export type RoomState = z.infer<typeof RoomStateSchema>

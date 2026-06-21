@@ -5,7 +5,7 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
   if (state === null) {
     if (event.type !== 'room.created')
       throw new Error(`first event must be room.created, got "${event.type}"`)
-    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [] }
+    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [], sessions: [] }
   }
 
   // Enforce domain invariants here so every write path (the RoomLedger preflight) and
@@ -57,6 +57,10 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
       if (state.escalations.some(e => e.id === event.escalation.id))
         throw new Error(`duplicate escalation id "${event.escalation.id}"`)
       return { ...state, escalations: [...state.escalations, event.escalation] }
+    case 'session.started':
+      if (event.roomId !== state.room.id)
+        throw new Error(`session.started roomId "${event.roomId}" does not match room "${state.room.id}"`)
+      return { ...state, sessions: [...state.sessions, { tool: event.tool, sessionName: event.sessionName, at: event.at }] }
   }
 }
 

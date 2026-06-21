@@ -35,6 +35,18 @@ describe('applyEvent', () => {
     expect(state.escalations).toHaveLength(1)
   })
 
+  it('initializes sessions to empty on room.created', () => {
+    expect(applyEvent(null, created).sessions).toEqual([])
+  })
+
+  it('appends a session on session.started', () => {
+    const state = applyEvents([
+      created,
+      { type: 'session.started', at: 't1', roomId: 'r1', tool: 'zellij', sessionName: 'octowiz-r1' },
+    ])!
+    expect(state.sessions).toEqual([{ tool: 'zellij', sessionName: 'octowiz-r1', at: 't1' }])
+  })
+
   it('returns null for an empty event log', () => {
     expect(applyEvents([])).toBeNull()
   })
@@ -98,6 +110,12 @@ describe('applyEvent invariants', () => {
   it('rejects an escalation referencing an unknown task', () => {
     expect(() => applyEvents(join(
       { type: 'escalation.recorded', at: 't1', escalation: { id: 'e1', roomId: 'r1', taskId: 'ghost', reason: 'x', createdAt: 't1' } },
+    ))).toThrow()
+  })
+
+  it('rejects a session.started whose roomId does not match the room', () => {
+    expect(() => applyEvents(join(
+      { type: 'session.started', at: 't1', roomId: 'other', tool: 'zellij', sessionName: 'octowiz-other' },
     ))).toThrow()
   })
 
