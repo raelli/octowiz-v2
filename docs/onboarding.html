@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Octowiz-v2 Onboarding Guide</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #11182d;
+      --panel-2: #182241;
+      --text: #e9efff;
+      --muted: #b7c4ea;
+      --ok: #23c98a;
+      --warn: #ffca57;
+      --line: #26345e;
+      --accent: #6ea8ff;
+      --code-bg: #0b1227;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(180deg, #0a0f1d 0%, #0b1020 100%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 20px 80px;
+    }
+    .hero {
+      background: radial-gradient(circle at top right, #213978 0%, #121a31 45%, #11182d 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    h1, h2, h3 {
+      line-height: 1.2;
+      margin: 0 0 12px;
+    }
+    h1 { font-size: clamp(1.8rem, 3vw, 2.5rem); }
+    h2 { font-size: clamp(1.25rem, 2.3vw, 1.7rem); margin-top: 22px; }
+    h3 { font-size: 1.05rem; margin-top: 18px; }
+    p, li { color: var(--muted); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel) 0%, #0f1730 100%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .span-12 { grid-column: span 12; }
+    .span-6 { grid-column: span 12; }
+    .step {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--accent);
+      font-weight: 700;
+      margin-right: 8px;
+      font-size: 0.9rem;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    pre {
+      margin: 10px 0 0;
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      overflow-x: auto;
+      color: #dce7ff;
+      font-size: 0.9rem;
+    }
+    .note {
+      border-left: 3px solid var(--accent);
+      background: #111a37;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 0.92rem;
+    }
+    .ok { color: var(--ok); font-weight: 600; }
+    .warn { color: var(--warn); font-weight: 600; }
+    .toc a {
+      color: #cfe0ff;
+      text-decoration: none;
+    }
+    .toc li { margin: 4px 0; }
+    .mini { font-size: 0.9rem; }
+    .kbd {
+      background: #0f1936;
+      border: 1px solid var(--line);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 0 6px;
+      color: #d7e6ff;
+      font-size: 0.85em;
+      white-space: nowrap;
+    }
+    footer {
+      margin-top: 28px;
+      color: #9db0dc;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    @media (min-width: 900px) {
+      .span-6 { grid-column: span 6; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Octowiz-v2 Onboarding</h1>
+      <p>
+        This guide takes you from a fresh machine to a working Octowiz flow using
+        <strong>Podman + Zellij + OpenCode + the Octowiz CLI + Nuxt dashboard</strong>.
+      </p>
+      <div class="note">
+        Goal: create a room, run a task pipeline, and inspect it from both CLI and web UI.
+      </div>
+    </section>
+
+    <div class="grid">
+      <article class="card span-6">
+        <h2>Table of Contents</h2>
+        <ol class="toc">
+          <li><a href="#prereqs">Install prerequisites</a></li>
+          <li><a href="#workspace">Bootstrap the workspace</a></li>
+          <li><a href="#podman">Initialize and start Podman machine</a></li>
+          <li><a href="#env">Configure model/runtime environment</a></li>
+          <li><a href="#first-run">Run your first room and task</a></li>
+          <li><a href="#dashboard">Open the web dashboard</a></li>
+          <li><a href="#daily">Daily workflow commands</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+        </ol>
+      </article>
+
+      <article class="card span-6">
+        <h2>System expectations</h2>
+        <ul>
+          <li>GitHub CLI auth is required for delivery/PR steps.</li>
+          <li>Podman must be running (sandbox provider defaults to Podman).</li>
+          <li>Zellij + OpenCode are used to launch collaborative coding sessions.</li>
+          <li>For agent/review/escalation paths, configure LiteLLM env vars or a local model command.</li>
+        </ul>
+      </article>
+
+      <article class="card span-12" id="prereqs">
+        <h2><span class="step">1</span>Install prerequisites</h2>
+        <p class="mini">If you already have these tools, skip to verification.</p>
+        <h3>Install via Homebrew</h3>
+<pre>brew install pnpm gh zellij podman
+# OpenCode install method may vary by your setup; ensure `opencode` is on PATH.</pre>
+        <h3>Verify tool availability</h3>
+<pre>pnpm --version
+gh --version
+zellij --version
+podman --version
+opencode --version</pre>
+      </article>
+
+      <article class="card span-12" id="workspace">
+        <h2><span class="step">2</span>Bootstrap the workspace</h2>
+<pre>git clone https://github.com/raelli/octowiz-v2.git
+cd octowiz-v2
+pnpm install</pre>
+        <h3>Run baseline quality checks</h3>
+<pre>pnpm lint
+pnpm -r type-check
+pnpm -r test</pre>
+      </article>
+
+      <article class="card span-12" id="podman">
+        <h2><span class="step">3</span>Initialize and start Podman machine</h2>
+<pre>podman machine list
+podman machine init        # only needed once if no machine exists
+podman machine start
+podman info</pre>
+        <p class="mini">
+          On macOS, Podman needs this VM for containers. Keep it running while using Octowiz commands that start sandboxes.
+        </p>
+      </article>
+
+      <article class="card span-12" id="env">
+        <h2><span class="step">4</span>Configure model/runtime environment</h2>
+        <p>
+          Octowiz can run with LiteLLM-backed models (recommended path here) or a local model binary fallback.
+        </p>
+        <h3>Option A (LiteLLM path)</h3>
+<pre>export LITELLM_BASE_URL="{{LITELLM_BASE_URL}}"
+export LITELLM_API_KEY="{{LITELLM_API_KEY}}"</pre>
+        <h3>Option B (local model fallback)</h3>
+<pre>export OCTOWIZ_MODEL_CMD="{{OCTOWIZ_MODEL_CMD}}"</pre>
+        <div class="note">
+          Use Option A if you want router/gateway/aelli-backed flows. Use Option B only when running local model worker CLI.
+        </div>
+        <h3>GitHub auth check</h3>
+<pre>gh auth status || gh auth login</pre>
+      </article>
+
+      <article class="card span-12" id="first-run">
+        <h2><span class="step">5</span>Run your first room and task</h2>
+        <h3>Create room + task</h3>
+<pre># create room
+pnpm --filter @octowiz/cli octowiz create-room --name "Demo Room"
+
+# capture returned room id, then create task
+pnpm --filter @octowiz/cli octowiz create-task --room &lt;ROOM_ID&gt; --title "Implement onboarding slice"</pre>
+        <h3>Start room runtime (sandbox + zellij + opencode)</h3>
+<pre>pnpm --filter @octowiz/cli octowiz start --room &lt;ROOM_ID&gt; --repo "$PWD"</pre>
+        <h3>Attach to the Zellij session</h3>
+<pre>zellij attach octowiz-&lt;ROOM_ID&gt;</pre>
+        <h3>Run full orchestration pipeline</h3>
+        <p class="mini">Before this step, ensure your local checkout is clean (<code>git status --short</code>) so branch/PR flow is predictable.</p>
+<pre>pnpm --filter @octowiz/cli octowiz run-task \
+  --room &lt;ROOM_ID&gt; \
+  --task &lt;TASK_ID&gt; \
+  --agent impl-1 \
+  --reviewer rev-1 \
+  --repo "$PWD" \
+  --branch feat/demo-room-task \
+  --base main \
+  --verdict approved</pre>
+        <h3>Inspect current room state</h3>
+<pre>pnpm --filter @octowiz/cli octowiz status --room &lt;ROOM_ID&gt;</pre>
+      </article>
+
+      <article class="card span-12" id="dashboard">
+        <h2><span class="step">6</span>Open the web dashboard</h2>
+<pre>export NUXT_PUBLIC_ROOM_ID=&lt;ROOM_ID&gt;
+export NUXT_LEDGER_DIR=".octowiz/ledger"
+pnpm --filter @octowiz/web dev</pre>
+        <p class="mini">
+          Then open the local Nuxt URL and verify room status, participants, tasks, validations, reviews, and escalations.
+        </p>
+      </article>
+
+      <article class="card span-6" id="daily">
+        <h2><span class="step">7</span>Daily workflow cheat sheet</h2>
+<pre># quick room startup (create + start)
+pnpm --filter @octowiz/cli octowiz up --name "Daily Room" --repo "$PWD"
+
+# assign task
+pnpm --filter @octowiz/cli octowiz assign --room &lt;ROOM_ID&gt; --task &lt;TASK_ID&gt; --agent impl-1
+
+# validate explicitly
+pnpm --filter @octowiz/cli octowiz validate --room &lt;ROOM_ID&gt; --task &lt;TASK_ID&gt;
+
+# review explicitly
+pnpm --filter @octowiz/cli octowiz review --room &lt;ROOM_ID&gt; --task &lt;TASK_ID&gt; --reviewer rev-1 --verdict approved --repo "$PWD"
+
+# escalate if needed
+pnpm --filter @octowiz/cli octowiz escalate --room &lt;ROOM_ID&gt; --task &lt;TASK_ID&gt;</pre>
+      </article>
+
+      <article class="card span-6" id="troubleshooting">
+        <h2><span class="step">8</span>Troubleshooting</h2>
+        <h3>Podman issues</h3>
+<pre>podman machine list
+podman machine start
+podman info</pre>
+        <h3>Zellij session not found</h3>
+<pre>zellij list-sessions -n -s
+pnpm --filter @octowiz/cli octowiz start --room &lt;ROOM_ID&gt; --repo "$PWD"</pre>
+        <h3>OpenCode launch failures</h3>
+<pre>opencode --version
+which opencode</pre>
+        <h3>GitHub PR delivery failures</h3>
+<pre>gh auth status
+git remote -v</pre>
+        <h3>Model path failures</h3>
+<pre># LiteLLM path
+env | grep LITELLM
+
+# local model path
+which octowiz-model
+echo $OCTOWIZ_MODEL_CMD</pre>
+        <p class="warn">If model env is missing, commands that need agent output/review/escalation will fail.</p>
+      </article>
+
+      <article class="card span-12">
+        <h2>Optional smoke checks</h2>
+<pre># CLI smoke (requires OCTOWIZ_SMOKE + zellij binary)
+OCTOWIZ_SMOKE=1 pnpm --filter @octowiz/cli test
+
+# sandbox runtime smoke (requires OCTOWIZ_SANDBOX_SMOKE + running container runtime)
+OCTOWIZ_SANDBOX_SMOKE=1 pnpm --filter @octowiz/sandbox-runtime test</pre>
+      </article>
+    </div>
+
+    <footer>
+      You are ready when you can run <span class="kbd">create-room</span> → <span class="kbd">start</span> → <span class="kbd">run-task</span> and see state in both CLI + dashboard.
+    </footer>
+  </div>
+</body>
+</html>
