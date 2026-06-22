@@ -8,7 +8,7 @@ import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
-import { buildEscalationRequest, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
+import { buildEscalationRequest, createA2aAelliClient, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
 import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
 import { isMergeReady } from '@octowiz/doctrine'
 import { generatePullRequestBody, openPullRequestForBranch } from '@octowiz/github-adapter'
@@ -306,11 +306,15 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
   const provider = selectProvider('auto', defaultRun)
   const worker = createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
-  // The real ÆLLI client is deferred (de-faking is a separate item), so wire one that fails
-  // loudly if invoked — no command in this slice calls it, and a silent no-op would hide that.
-  const aelliClient: AelliClient = async () => {
-    throw new Error('ÆLLI client not configured (item #2)')
-  }
+  // Real ÆLLI seam: one A2A call to the deployed brain when the LiteLLM gateway is configured.
+  // Absent config, fail loud on use (don't silently no-op) — escalations must not vanish.
+  const aelliBaseUrl = process.env.LITELLM_BASE_URL
+  const aelliApiKey = process.env.LITELLM_API_KEY
+  const aelliClient: AelliClient = aelliBaseUrl && aelliApiKey
+    ? createA2aAelliClient({ baseUrl: aelliBaseUrl, apiKey: aelliApiKey })
+    : async () => {
+      throw new Error('ÆLLI client not configured: set LITELLM_BASE_URL and LITELLM_API_KEY')
+    }
   runCli(argv, {
     ledger,
     run: defaultRun,
