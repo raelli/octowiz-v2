@@ -1,11 +1,12 @@
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { generatePullRequestBody } from '@octowiz/github-adapter'
 import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { describe, expect, it, vi } from 'vitest'
-import { runCli } from './octowiz'
+import { defaultRun, runCli } from './octowiz'
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'octowiz-cli-'))
@@ -43,6 +44,15 @@ describe('create-room', () => {
   })
 })
 
+describe('defaultRun', () => {
+  it('executes commands from the repository root', async () => {
+    const expectedRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    const result = await defaultRun('node', ['-e', 'process.stdout.write(process.cwd())'])
+    expect(result.code).toBe(0)
+    expect(result.stdout).toBe(expectedRoot)
+  })
+})
+
 describe('start', () => {
   it('creates a sandbox before sessions, then records zellij + opencode', async () => {
     const { ledger, deps, run } = await fixture()
@@ -57,6 +67,16 @@ describe('start', () => {
     expect(after?.sessions.map(s => s.tool)).toEqual(['zellij', 'opencode'])
     const dispatchedOpencode = run.mock.calls.some(([cmd, args]) => cmd === 'zellij' && args.join(' ').includes('opencode'))
     expect(dispatchedOpencode).toBe(true)
+  })
+
+  it('does not forward the host --repo path as sandbox workdir', async () => {
+    const { deps } = await fixture()
+    const create = vi.fn(async (roomId: string) => ({ provider: 'fake', id: `sbx-${roomId}`, roomId }))
+    const provider: SandboxProvider = { name: 'fake', create, destroy: async () => {} }
+    const created = await runCli(['create-room', '--name', 'Demo'], { ...deps, provider })
+    await runCli(['start', '--room', created.room.id, '--repo', '/Users/demo/repo'], { ...deps, provider })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create).toHaveBeenCalledWith(created.room.id)
   })
 })
 

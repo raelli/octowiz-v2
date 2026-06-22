@@ -5,8 +5,9 @@ import type { ReviewVerdict, RoomState } from '@octowiz/schemas'
 import type { ReadFile, WorkflowStage } from '@octowiz/skill-runtime'
 import type { Check } from '@octowiz/validation'
 import { execFile } from 'node:child_process'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { buildEscalationRequest, createA2aAelliClient, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
 import { createAelliGatewayWorker, createAelliRouterWorker, createLocalModelWorker, dispatchReview, tieredAdvise } from '@octowiz/agent-runtime'
@@ -23,6 +24,13 @@ import { gitDiff } from './git-diff'
 import { orchestrate } from './orchestrate'
 
 type Run = (cmd: string, args: string[]) => Promise<{ code: number, stdout: string, stderr: string }>
+
+// Resolve stable repository paths from this file location so CLI behavior does not depend on
+// invocation cwd (e.g. `pnpm --filter @octowiz/cli` vs root-level execution).
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = resolve(SCRIPT_DIR, '..')
+const DEFAULT_LEDGER_DIR = join(REPO_ROOT, '.octowiz', 'ledger')
+const DEFAULT_SKILL_REGISTRY_PATH = join(REPO_ROOT, 'skills', 'registry.json')
 
 export interface Deps {
   ledger: RoomLedger
@@ -51,7 +59,7 @@ const execFileAsync = promisify(execFile)
  */
 export const defaultRun: Run = async (cmd, args) => {
   try {
-    const { stdout, stderr } = await execFileAsync(cmd, args)
+    const { stdout, stderr } = await execFileAsync(cmd, args, { cwd: REPO_ROOT })
     return { code: 0, stdout, stderr }
   }
   catch (error) {
@@ -123,8 +131,10 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       // Room lifecycle goes THROUGH the provider seam: create the sandbox and record it
       // before the zellij/opencode legs. M4 stayed host-first deliberately, so the legs
       // still launch on the host for now — wiring opencode to run inside the sandbox is a
-      // later milestone; this slice proves the lifecycle depends on the interface.
-      const sandbox = await provider.create(roomId, { workdir: repo })
+      // later milestone; this slice proves the lifecycle depends on the interface. Do not
+      // forward the host repo path as container --workdir: without a repo mount that path
+      // does not exist in-container and podman create fails.
+      const sandbox = await provider.create(roomId)
       await ledger.recordSandboxStart(roomId, sandbox.provider, sandbox.id, now())
       await ensureSession(roomId, run)
       await ledger.recordSessionStart(roomId, 'zellij', name, now())
@@ -346,7 +356,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
 // pathToFileURL handles paths with spaces/special chars that a raw `file://` would not.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
-  const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
+  const ledger = new RoomLedger(new FileLedgerStore(DEFAULT_LEDGER_DIR))
   const provider = selectProvider('auto', defaultRun)
   // Real ÆLLI seams talk to the deployed brain through the LiteLLM gateway when configured.
   // A2A lives at the gateway ROOT, so strip the `/v1` chat-completions suffix off LITELLM_BASE_URL.
@@ -385,7 +395,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     worker,
     aelliClient,
     readFile: defaultReadFile,
-    skillRegistryPath: 'skills/registry.json',
+    skillRegistryPath: DEFAULT_SKILL_REGISTRY_PATH,
     checks: DEFAULT_CHECKS,
     gatewayWorker,
     review,
