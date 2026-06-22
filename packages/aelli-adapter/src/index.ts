@@ -1,6 +1,8 @@
 import type { RoomLedger } from '@octowiz/room-ledger'
 import type { Review, Room, RoomState, Task, Validation } from '@octowiz/schemas'
 
+export { type A2aClientConfig, createA2aAelliClient } from './a2a-client'
+
 export interface EscalationDecision {
   escalate: boolean
   /** Human-readable justification, present only when `escalate` is true. */
