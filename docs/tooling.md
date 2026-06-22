@@ -22,9 +22,12 @@ Root files should include:
 ```text
 .editorconfig
 .npmrc
-.nuxtrc
+.secretlintrc.json
+commitlint.config.mjs
+eslint.config.mjs
 mise.toml
 package.json
+pnpm-lock.yaml
 pnpm-workspace.yaml
 tsconfig.base.json
 ```
