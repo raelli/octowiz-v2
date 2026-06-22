@@ -1,5 +1,5 @@
 import type { AelliClient } from '@octowiz/aelli-adapter'
-import type { AgentWorker } from '@octowiz/agent-runtime'
+import type { AdviceReviewer, AgentWorker } from '@octowiz/agent-runtime'
 import type { SandboxProvider } from '@octowiz/sandbox-runtime'
 import type { ReviewVerdict, RoomState } from '@octowiz/schemas'
 import type { ReadFile, WorkflowStage } from '@octowiz/skill-runtime'
@@ -9,7 +9,7 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { buildEscalationRequest, createA2aAelliClient, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
-import { createAelliRouterWorker, createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
+import { createAelliGatewayWorker, createAelliRouterWorker, createLocalModelWorker, dispatchReview, tieredAdvise } from '@octowiz/agent-runtime'
 import { isMergeReady } from '@octowiz/doctrine'
 import { generatePullRequestBody, openPullRequestForBranch } from '@octowiz/github-adapter'
 import { startArgs } from '@octowiz/opencode-adapter'
@@ -38,6 +38,8 @@ export interface Deps {
   // Injectable so tests/acceptance supply trivial real-`pnpm` checks instead of recursively
   // running the monorepo suite; defaults to the validation package's DEFAULT_CHECKS.
   checks: Check[]
+  gatewayWorker?: (modelId: string) => AgentWorker
+  review?: AdviceReviewer
 }
 
 const execFileAsync = promisify(execFile)
@@ -71,7 +73,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS } = deps
+  const { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS, gatewayWorker, review } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -83,6 +85,9 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       title: { type: 'string' },
       verdict: { type: 'string' },
       agent: { type: 'string' },
+      advisor: { type: 'string' },
+      tiers: { type: 'string' },
+      prompt: { type: 'string' },
       stage: { type: 'string' },
       branch: { type: 'string' },
       base: { type: 'string' },
@@ -239,6 +244,44 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
         at: now(),
       })
     }
+    case 'advise': {
+      const roomId = flag(values, 'room')
+      const taskId = flag(values, 'task')
+      const advisorId = flag(values, 'advisor')
+      const reviewerId = flag(values, 'reviewer')
+      const tiers = flag(values, 'tiers').split(',').map(t => t.trim()).filter(t => t !== '')
+      if (tiers.length === 0)
+        throw new Error('--tiers must list at least one model id (comma-separated)')
+      if (advisorId === reviewerId)
+        throw new Error('--advisor and --reviewer must differ (no self-review)')
+      if (gatewayWorker === undefined || review === undefined)
+        throw new Error('advise requires gatewayWorker and review deps (set LITELLM_BASE_URL + LITELLM_API_KEY)')
+      const prompt = (values.prompt as string | undefined) ?? ''
+      const state = await ledger.getState(roomId)
+      if (state === null)
+        throw new Error(`room \"${roomId}\" not found`)
+      if (!state.tasks.some(t => t.id === taskId))
+        throw new Error(`task \"${taskId}\" not found in room \"${roomId}\"`)
+      const existingAdvisor = state.participants.find(p => p.id === advisorId)
+      if (existingAdvisor !== undefined && (existingAdvisor.kind !== 'agent' || !existingAdvisor.roles.includes('advisor')))
+        throw new Error(`cannot advise task \"${taskId}\": participant \"${advisorId}\" already exists without the agent advisor role (the room ledger has no role-update event)`)
+      if (existingAdvisor === undefined)
+        await ledger.addParticipant(roomId, { id: advisorId, kind: 'agent', roles: ['advisor'], displayName: advisorId }, now())
+      const existingReviewer = state.participants.find(p => p.id === reviewerId)
+      if (existingReviewer !== undefined && (existingReviewer.kind !== 'agent' || !existingReviewer.roles.includes('reviewer')))
+        throw new Error(`cannot advise task \"${taskId}\": participant \"${reviewerId}\" already exists without the agent reviewer role (the room ledger has no role-update event)`)
+      if (existingReviewer === undefined)
+        await ledger.addParticipant(roomId, { id: reviewerId, kind: 'agent', roles: ['reviewer'], displayName: reviewerId }, now())
+      const result = await tieredAdvise(
+        { roomId, taskId, advisorId, reviewerId, prompt, tiers, at: now() },
+        { ledger, gatewayWorker, review },
+      )
+      console.log(result.status === 'approved' ? `advice approved at tier ${result.tier}` : 'advice escalated (all tiers rejected)')
+      const final = await ledger.getState(roomId)
+      if (final === null)
+        throw new Error(`room \"${roomId}\" not found`)
+      return final
+    }
     case 'deliver': {
       const roomId = flag(values, 'room')
       const taskId = flag(values, 'task')
@@ -295,7 +338,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       }, deps, runCli)
     }
     default:
-      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills | deliver | run-task)`)
+      throw new Error(`unknown subcommand: ${subcommand ?? '(none)'} (expected create-room | create-task | start | validate | status | up | assign | escalate | review | skills | deliver | run-task | advise)`)
   }
 }
 
@@ -307,6 +350,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const provider = selectProvider('auto', defaultRun)
   // Real ÆLLI seams talk to the deployed brain through the LiteLLM gateway when configured.
   // A2A lives at the gateway ROOT, so strip the `/v1` chat-completions suffix off LITELLM_BASE_URL.
+  const aelliGatewayBaseUrl = process.env.LITELLM_BASE_URL
   const aelliBaseUrl = process.env.LITELLM_BASE_URL?.replace(/\/v1\/?$/, '')
   const aelliApiKey = process.env.LITELLM_API_KEY
   // Model worker: route implement/review through ÆLLI's router (generate -> review -> revise
@@ -321,6 +365,18 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     : async () => {
       throw new Error('ÆLLI client not configured: set LITELLM_BASE_URL and LITELLM_API_KEY')
     }
+  const gatewayWorker = (modelId: string): AgentWorker => {
+    if (!aelliGatewayBaseUrl || !aelliApiKey)
+      throw new Error('ÆLLI gateway not configured: set LITELLM_BASE_URL and LITELLM_API_KEY')
+    return createAelliGatewayWorker(modelId, { baseUrl: aelliGatewayBaseUrl, apiKey: aelliApiKey })
+  }
+  const reviewerModelId = process.env.OCTOWIZ_REVIEWER_MODEL ?? 'octowiz-reviewer'
+  const review: AdviceReviewer = async ({ prompt, candidate }) => {
+    const reviewPrompt = `You are an independent reviewer. Task:\n${prompt}\n\nCandidate recommendation:\n${candidate}\n\nReply with exactly one word: approved, rejected, or changes_requested.`
+    const out = await gatewayWorker(reviewerModelId)({ role: 'reviewer', prompt: reviewPrompt })
+    const parsed = ReviewVerdictSchema.safeParse(out.text.trim().toLowerCase())
+    return parsed.success ? parsed.data : 'rejected'
+  }
   runCli(argv, {
     ledger,
     run: defaultRun,
@@ -331,6 +387,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     readFile: defaultReadFile,
     skillRegistryPath: 'skills/registry.json',
     checks: DEFAULT_CHECKS,
+    gatewayWorker,
+    review,
   })
     .then((state) => {
       // `status` already printed its projection; for mutating commands, echo the room id

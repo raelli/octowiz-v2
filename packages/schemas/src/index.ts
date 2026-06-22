@@ -83,6 +83,19 @@ export const EscalationSchema = z.object({
 })
 export type Escalation = z.infer<typeof EscalationSchema>
 
+export const AdviceSchema = z.object({
+  id: z.string().min(1),
+  roomId: z.string().min(1),
+  taskId: z.string().min(1),
+  advisorId: z.string().min(1),
+  reviewerId: z.string().min(1),
+  tier: z.string().min(1),
+  recommendation: z.string().min(1),
+  verdict: z.literal('approved'),
+  createdAt: z.string().min(1),
+})
+export type Advice = z.infer<typeof AdviceSchema>
+
 // Append-only ledger events. `at` is a caller-supplied ISO timestamp string —
 // keeping time out of the pure core makes the reducer deterministic and testable.
 export const LedgerEventSchema = z.discriminatedUnion('type', [
@@ -94,6 +107,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('review.recorded'), at: z.string().min(1), review: ReviewSchema }),
   z.object({ type: z.literal('validation.recorded'), at: z.string().min(1), validation: ValidationSchema }),
   z.object({ type: z.literal('escalation.recorded'), at: z.string().min(1), escalation: EscalationSchema }),
+  z.object({ type: z.literal('advice.recorded'), at: z.string().min(1), advice: AdviceSchema }),
   z.object({ type: z.literal('session.started'), at: z.string().min(1), roomId: z.string().min(1), tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1) }),
   z.object({ type: z.literal('sandbox.started'), at: z.string().min(1), roomId: z.string().min(1), provider: z.string().min(1), sandboxId: z.string().min(1) }),
 ])
@@ -122,6 +136,7 @@ export const RoomStateSchema = z.object({
   reviews: z.array(ReviewSchema),
   validations: z.array(ValidationSchema),
   escalations: z.array(EscalationSchema),
+  advice: z.array(AdviceSchema),
   sessions: z.array(z.object({ tool: z.enum(['zellij', 'opencode']), sessionName: z.string().min(1), at: z.string().min(1) })),
   sandboxes: z.array(z.object({ provider: z.string().min(1), sandboxId: z.string().min(1), at: z.string().min(1) })),
 })

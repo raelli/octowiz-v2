@@ -317,6 +317,64 @@ describe('escalate', () => {
   })
 })
 
+describe('advise', () => {
+  it('records advice when the cheap tier is approved', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    const dispatched: string[] = []
+    const gatewayWorker = (modelId: string) => async () => {
+      dispatched.push(modelId)
+      return { text: `${modelId}: advice` }
+    }
+    const review = async () => 'approved' as const
+
+    await runCli(
+      ['advise', '--room', roomId, '--task', taskId, '--advisor', 'adv', '--reviewer', 'rev', '--tiers', 'cheap,expensive'],
+      { ...deps, gatewayWorker, review },
+    )
+
+    expect(dispatched).toEqual(['cheap'])
+    const state = await ledger.getState(roomId)
+    expect(state?.advice).toHaveLength(1)
+  })
+
+  it('escalates when all tiers are rejected', async () => {
+    const { ledger, deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    const gatewayWorker = (modelId: string) => async () => ({ text: `${modelId}: advice` })
+    const review = async () => 'rejected' as const
+
+    await runCli(
+      ['advise', '--room', roomId, '--task', taskId, '--advisor', 'adv', '--reviewer', 'rev', '--tiers', 'cheap,expensive'],
+      { ...deps, gatewayWorker, review },
+    )
+
+    const state = await ledger.getState(roomId)
+    expect(state?.escalations).toHaveLength(1)
+  })
+
+  it('rejects advisor equal to reviewer', async () => {
+    const { deps } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Demo'], deps)
+    const roomId = created.room.id
+    const withTask = await runCli(['create-task', '--room', roomId, '--title', 'T'], deps)
+    const taskId = withTask.tasks[0]!.id
+    const gatewayWorker = (_modelId: string) => async () => ({ text: 'advice' })
+    const review = async () => 'approved' as const
+
+    await expect(runCli(
+      ['advise', '--room', roomId, '--task', taskId, '--advisor', 'x', '--reviewer', 'x', '--tiers', 'cheap'],
+      { ...deps, gatewayWorker, review },
+    )).rejects.toThrow(/no self-review/)
+  })
+})
+
 describe('skills', () => {
   it('selects the stage\'s skills, prints their ids, and does not mutate the ledger', async () => {
     const { ledger, deps } = await fixture()

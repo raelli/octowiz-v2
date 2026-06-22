@@ -55,6 +55,7 @@ describe('schemas', () => {
       reviews: [],
       validations: [],
       escalations: [],
+      advice: [],
       sessions,
       sandboxes,
     })
