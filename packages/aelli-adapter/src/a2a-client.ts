@@ -3,16 +3,15 @@ import { randomUUID } from 'node:crypto'
 
 /**
  * Config for the real ÆLLI seam: one A2A (JSON-RPC 2.0) `message/send` to the deployed brain.
- * Mirrors the v0.9.23 plugin's `octowiz.escalate_to_aelli` (capability `aelli.decide`), but
- * goes through the LiteLLM gateway, which routes by **agent name** (`/a2a/<agentName>`) and
- * streams the reply as SSE.
+ * Mirrors the v0.9.23 plugin's `octowiz.escalate_to_aelli`, but goes through the LiteLLM
+ * gateway, which routes by **agent name** (`/a2a/<agentName>`) and streams the reply as SSE.
  */
 export interface A2aClientConfig {
   /** Gateway A2A base, e.g. `https://llm.integrahub.de` (NOT the `/v1` chat-completions base). */
   baseUrl: string
   /** LiteLLM-gateway bearer token (`LITELLM_API_KEY`). */
   apiKey: string
-  /** A2A agent name to route to; defaults to the orchestrator that owns `aelli.decide`. */
+  /** A2A agent name to route to; defaults to the orchestrator that handles escalations. */
   agentName?: string
   /** Injectable for tests; defaults to global `fetch`. */
   fetchImpl?: typeof fetch
@@ -23,15 +22,11 @@ export interface A2aClientConfig {
 }
 
 /**
- * The gateway streams Server-Sent Events: `data: <json>` lines terminated by `data: [DONE]`,
- * each payload being the skill's own object (confirmed live against `/a2a/aelli-router`). Pull
- * the recommendation out of the terminal payload.
- *
- * NOTE: the exact `aelli.decide` field is UNVERIFIED — a live decide probe returned 401 from the
- * internal aelli (the gateway does not forward the aelli auth secret yet), so end-to-end could
- * not be confirmed. Extraction is therefore defensive: a string payload is used directly; an
- * object is checked for the common text fields, then a bare A2A message's `parts[0].text`, then
- * stringified as a last resort. Tighten once the 401 is resolved and the shape is observed.
+ * The gateway streams Server-Sent Events: `data: <json>` lines terminated by `data: [DONE]`.
+ * The orchestrator's `dispatchSSE` emits `data: ${JSON.stringify(artifact)}`, and its `handle()`
+ * returns `{ text }` — so the terminal payload is `{ text: "<recommendation>" }`. Pull `.text`
+ * first, then fall back defensively (other agents / shapes): common text fields, a bare A2A
+ * message's `parts[0].text`, else the stringified payload.
  */
 export function extractRecommendation(body: string): string | undefined {
   let last: unknown
@@ -55,9 +50,9 @@ export function extractRecommendation(body: string): string | undefined {
     return last.trim() === '' ? undefined : last
   if (typeof last === 'object' && last !== null) {
     const o = last as Record<string, unknown>
-    if (o.error !== undefined)
+    if (o.error)
       throw new Error(`ÆLLI A2A error: ${typeof o.error === 'string' ? o.error : JSON.stringify(o.error)}`)
-    for (const key of ['recommendation', 'decision', 'answer', 'text', 'output', 'message'] as const) {
+    for (const key of ['text', 'recommendation', 'decision', 'answer', 'output', 'message'] as const) {
       if (typeof o[key] === 'string' && (o[key] as string).trim() !== '')
         return o[key] as string
     }
@@ -75,11 +70,13 @@ export function extractRecommendation(body: string): string | undefined {
 
 /**
  * Build the real `AelliClient`: POST an escalation to ÆLLI's orchestrator and return its
- * recommendation. The structured `AelliEscalationRequest` rides in `metadata.context`;
- * `parts[0].text` carries a human-readable question so raw A2A traffic is legible.
+ * recommendation. The orchestrator's `parseEvent` does `JSON.parse(parts[0].text)` and reads
+ * `{ query, context }`, so the question + the structured `AelliEscalationRequest` travel as a
+ * JSON-stringified **event** (NOT a plain string — a plain string fails `JSON.parse` → 400).
+ * `metadata` carries the octowiz tag so the octowiz system prompt is injected server-side.
  *
- * Fails closed, matching `recordAelliEscalation`: a non-2xx, a JSON-RPC error, or a response
- * with no recommendation all throw, so a lost recommendation never looks like success.
+ * Fails closed, matching `recordAelliEscalation`: a non-2xx, an A2A error, or a response with
+ * no recommendation all throw, so a lost recommendation never looks like success.
  */
 export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
   const fetchImpl = config.fetchImpl ?? fetch
@@ -89,7 +86,9 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
   const url = `${config.baseUrl.replace(/\/$/, '')}/a2a/${agentName}`
 
   return async (request: AelliEscalationRequest): Promise<string> => {
-    const question = `Task "${request.task.title}" needs a decision: ${request.reason ?? 'no reason given'}`
+    const query = `Task "${request.task.title}" needs a decision: ${request.reason ?? 'no reason given'}`
+    // parseEvent does JSON.parse(parts[0].text); the orchestrator reads { query, context }.
+    const event = { query, context: request }
     const payload = {
       jsonrpc: '2.0',
       method: 'message/send',
@@ -99,12 +98,12 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
           // role + messageId are required by the gateway's MessageSendParams validation.
           role: 'user',
           messageId: newId(),
-          parts: [{ kind: 'text', text: question }],
+          parts: [{ kind: 'text', text: JSON.stringify(event) }],
           metadata: {
             capability: 'aelli.decide',
-            context: request,
             priority: 'normal',
             source: 'octowiz-v2',
+            octowiz_doctrine: 'v1',
           },
         },
       },
@@ -112,7 +111,11 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
 
     const res = await fetchImpl(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
+      headers: {
+        'Accept': 'text/event-stream',
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(timeoutMs),
     })
