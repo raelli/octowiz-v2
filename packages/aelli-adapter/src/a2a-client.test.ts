@@ -1,6 +1,6 @@
 import type { AelliEscalationRequest } from './index'
 import { describe, expect, it } from 'vitest'
-import { createA2aAelliClient, extractRecommendation } from './a2a-client'
+import { createA2aAelliClient, extractRecommendation, resolveTimeoutMs } from './a2a-client'
 
 function request(): AelliEscalationRequest {
   return {
@@ -171,5 +171,18 @@ describe('createA2aAelliClient', () => {
     const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', transport: 'send', fetchImpl: impl })
     await client(request())
     expect(JSON.parse(calls[0]!.init.body as string).method).toBe('message/send')
+  })
+})
+
+describe('resolveTimeoutMs (env validation — no premature-abort footgun)', () => {
+  it('honors a finite override at/above the floor', () => {
+    expect(resolveTimeoutMs('150000')).toBe(150000)
+  })
+  it('falls back to default for negative / zero / too-small / NaN / undefined', () => {
+    expect(resolveTimeoutMs('-1')).toBe(120000)
+    expect(resolveTimeoutMs('0')).toBe(120000)
+    expect(resolveTimeoutMs('500')).toBe(120000) // below the 95s floor (would invert vs inner 90s)
+    expect(resolveTimeoutMs('abc')).toBe(120000)
+    expect(resolveTimeoutMs(undefined)).toBe(120000)
   })
 })

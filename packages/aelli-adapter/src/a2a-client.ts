@@ -100,7 +100,7 @@ function chunkRecommendation(chunk: unknown): string | undefined {
  */
 function isBenignTrailingError(err: { code?: unknown, message?: unknown }): boolean {
   const msg = typeof err.message === 'string' ? err.message : ''
-  return err.code === -32603 && /Expecting value/i.test(msg)
+  return err.code === -32603 && /^Expecting value: line 1 column \d+ \(char \d+\)/i.test(msg)
 }
 
 /**
@@ -168,10 +168,24 @@ export function extractRecommendation(body: string): string | undefined {
  * Fails closed: a non-2xx, a real stream error, a malformed stream, or no recommendation all
  * throw, so a lost recommendation never looks like success.
  */
+// AELLI's inner LLM timeout defaults to 90s; the outer client timeout MUST exceed it.
+const MIN_TIMEOUT_MS = 95_000
+const DEFAULT_TIMEOUT_MS = 120_000
+
+/**
+ * Resolve the outer request timeout from `OCTOWIZ_AELLI_TIMEOUT_MS`. Only a finite value at or
+ * above MIN_TIMEOUT_MS is honored; NaN, <=0, or too-small values fall back to DEFAULT_TIMEOUT_MS
+ * so a bad env can never reintroduce the inversion (outer < inner → premature abort).
+ */
+export function resolveTimeoutMs(raw: string | undefined): number {
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= MIN_TIMEOUT_MS ? n : DEFAULT_TIMEOUT_MS
+}
+
 export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
   const fetchImpl = config.fetchImpl ?? fetch
   const newId = config.newId ?? randomUUID
-  const timeoutMs = config.timeoutMs ?? (Number(process.env.OCTOWIZ_AELLI_TIMEOUT_MS) || 120_000)
+  const timeoutMs = config.timeoutMs ?? resolveTimeoutMs(process.env.OCTOWIZ_AELLI_TIMEOUT_MS)
   const transport = config.transport ?? (process.env.OCTOWIZ_A2A_TRANSPORT === 'send' ? 'send' : 'stream')
   const method = transport === 'send' ? 'message/send' : 'message/stream'
   const agentName = config.agentName ?? 'aelli-orchestrator'
