@@ -39,7 +39,7 @@ The MVP should not initially require:
 - Add pnpm workspace setup.
 - Add `apps/`, `layers/`, `packages/`, `docs/`, `skills/`, `examples/`, and `scripts/` directories.
 - Add `mise.toml`.
-- Add `.editorconfig`, `.npmrc`, `.nuxtrc`.
+- Add `.editorconfig` and `.npmrc`.
 - Add `tsconfig.base.json`.
 - Add shared ESLint and TypeScript config packages.
 - Document OpenCode-first and no React direction.
