@@ -305,11 +305,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
   const ledger = new RoomLedger(new FileLedgerStore('.octowiz/ledger'))
   const provider = selectProvider('auto', defaultRun)
-  const worker = createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
-  // Real ÆLLI seam: one A2A call to the deployed brain when the LiteLLM gateway is configured.
-  // Absent config, fail loud on use (don't silently no-op) — escalations must not vanish.
-  const aelliBaseUrl = process.env.LITELLM_BASE_URL
+  // Real ÆLLI seams talk to the deployed brain through the LiteLLM gateway when configured.
+  // A2A lives at the gateway ROOT, so strip the `/v1` chat-completions suffix off LITELLM_BASE_URL.
+  const aelliBaseUrl = process.env.LITELLM_BASE_URL?.replace(/\/v1\/?$/, '')
   const aelliApiKey = process.env.LITELLM_API_KEY
+  const worker = createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
+  // Escalation seam: one A2A call to ÆLLI's orchestrator. Absent config, fail loud on use
+  // (don't silently no-op) — escalations must not vanish.
   const aelliClient: AelliClient = aelliBaseUrl && aelliApiKey
     ? createA2aAelliClient({ baseUrl: aelliBaseUrl, apiKey: aelliApiKey })
     : async () => {

@@ -2,59 +2,91 @@ import type { AelliClient, AelliEscalationRequest } from './index'
 import { randomUUID } from 'node:crypto'
 
 /**
- * Config for the real ÆLLI seam: one A2A (JSON-RPC 2.0) HTTP call. The shape mirrors the
- * v0.9.23 plugin's `octowiz.escalate_to_aelli` capability — same endpoint (`/a2a/aelli`),
- * same `message/send` method, same `aelli.decide` capability metadata — so v2 talks to the
- * already-deployed brain rather than reimplementing it.
+ * Config for the real ÆLLI seam: one A2A (JSON-RPC 2.0) `message/send` to the deployed brain.
+ * Mirrors the v0.9.23 plugin's `octowiz.escalate_to_aelli` (capability `aelli.decide`), but
+ * goes through the LiteLLM gateway, which routes by **agent name** (`/a2a/<agentName>`) and
+ * streams the reply as SSE.
  */
 export interface A2aClientConfig {
-  /** ÆLLI A2A base, e.g. `https://llm.integrahub.de`. The `/a2a/aelli` path is appended. */
+  /** Gateway A2A base, e.g. `https://llm.integrahub.de` (NOT the `/v1` chat-completions base). */
   baseUrl: string
   /** LiteLLM-gateway bearer token (`LITELLM_API_KEY`). */
   apiKey: string
+  /** A2A agent name to route to; defaults to the orchestrator that owns `aelli.decide`. */
+  agentName?: string
   /** Injectable for tests; defaults to global `fetch`. */
   fetchImpl?: typeof fetch
   /** Injectable id generator; defaults to `randomUUID`. Tests pass a fixed id. */
   newId?: () => string
-  /** Request timeout in ms (default 30s). */
+  /** Request timeout in ms (default 60s). */
   timeoutMs?: number
 }
 
-interface A2aResponse {
-  result?: unknown
-  error?: { message?: string }
-}
-
 /**
- * Pull ÆLLI's recommendation text out of a JSON-RPC `result`, which is either a Task
- * (`{ artifacts: [{ parts }] }`) or a bare Message (`{ parts }`). First text part wins;
- * falls back to the first part. Returns undefined if no usable text is present.
- */
-function extractText(result: unknown): string | undefined {
-  const r = result as { artifacts?: { parts?: unknown[] }[], parts?: unknown[] } | undefined
-  const parts = r?.artifacts?.[0]?.parts ?? r?.parts
-  if (!Array.isArray(parts))
-    return undefined
-  const isTextPart = (p: unknown): p is { text: string } =>
-    typeof (p as { text?: unknown })?.text === 'string'
-  const part = parts.find(p => (p as { kind?: string })?.kind === 'text' && isTextPart(p)) ?? parts[0]
-  return isTextPart(part) ? part.text : undefined
-}
-
-/**
- * Build the real `AelliClient`: an injected async fn that POSTs an escalation to ÆLLI and
- * returns its recommendation string. The full `AelliEscalationRequest` rides in
- * `metadata.context` (the structured signal); `parts[0].text` carries a human-readable
- * question so a log of the A2A traffic is legible on its own.
+ * The gateway streams Server-Sent Events: `data: <json>` lines terminated by `data: [DONE]`,
+ * each payload being the skill's own object (confirmed live against `/a2a/aelli-router`). Pull
+ * the recommendation out of the terminal payload.
  *
- * Fails closed, matching `recordAelliEscalation` — a non-2xx, a JSON-RPC error, or a
- * response with no text part all throw, so a lost recommendation never looks like success.
+ * NOTE: the exact `aelli.decide` field is UNVERIFIED — a live decide probe returned 401 from the
+ * internal aelli (the gateway does not forward the aelli auth secret yet), so end-to-end could
+ * not be confirmed. Extraction is therefore defensive: a string payload is used directly; an
+ * object is checked for the common text fields, then a bare A2A message's `parts[0].text`, then
+ * stringified as a last resort. Tighten once the 401 is resolved and the shape is observed.
+ */
+export function extractRecommendation(body: string): string | undefined {
+  let last: unknown
+  for (const line of body.split(/\r?\n/)) {
+    if (!line.startsWith('data:'))
+      continue
+    const payload = line.slice(5).trim()
+    if (payload === '' || payload === '[DONE]')
+      continue
+    try {
+      last = JSON.parse(payload)
+    }
+    catch {
+      // A non-JSON data line: keep the raw text as a candidate.
+      last = payload
+    }
+  }
+  if (last === undefined)
+    return undefined
+  if (typeof last === 'string')
+    return last.trim() === '' ? undefined : last
+  if (typeof last === 'object' && last !== null) {
+    const o = last as Record<string, unknown>
+    if (o.error !== undefined)
+      throw new Error(`ÆLLI A2A error: ${typeof o.error === 'string' ? o.error : JSON.stringify(o.error)}`)
+    for (const key of ['recommendation', 'decision', 'answer', 'text', 'output', 'message'] as const) {
+      if (typeof o[key] === 'string' && (o[key] as string).trim() !== '')
+        return o[key] as string
+    }
+    // Bare A2A message: { parts: [{ kind: 'text', text }] }
+    const parts = (o as { parts?: unknown[] }).parts
+    if (Array.isArray(parts)) {
+      const part = parts.find(p => typeof (p as { text?: unknown })?.text === 'string') as { text?: string } | undefined
+      if (part?.text)
+        return part.text
+    }
+    return JSON.stringify(last)
+  }
+  return undefined
+}
+
+/**
+ * Build the real `AelliClient`: POST an escalation to ÆLLI's orchestrator and return its
+ * recommendation. The structured `AelliEscalationRequest` rides in `metadata.context`;
+ * `parts[0].text` carries a human-readable question so raw A2A traffic is legible.
+ *
+ * Fails closed, matching `recordAelliEscalation`: a non-2xx, a JSON-RPC error, or a response
+ * with no recommendation all throw, so a lost recommendation never looks like success.
  */
 export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
   const fetchImpl = config.fetchImpl ?? fetch
   const newId = config.newId ?? randomUUID
-  const timeoutMs = config.timeoutMs ?? 30_000
-  const url = `${config.baseUrl.replace(/\/$/, '')}/a2a/aelli`
+  const timeoutMs = config.timeoutMs ?? 60_000
+  const agentName = config.agentName ?? 'aelli-orchestrator'
+  const url = `${config.baseUrl.replace(/\/$/, '')}/a2a/${agentName}`
 
   return async (request: AelliEscalationRequest): Promise<string> => {
     const question = `Task "${request.task.title}" needs a decision: ${request.reason ?? 'no reason given'}`
@@ -64,6 +96,9 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
       id: newId(),
       params: {
         message: {
+          // role + messageId are required by the gateway's MessageSendParams validation.
+          role: 'user',
+          messageId: newId(),
           parts: [{ kind: 'text', text: question }],
           metadata: {
             capability: 'aelli.decide',
@@ -84,13 +119,9 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
     if (!res.ok)
       throw new Error(`ÆLLI A2A call failed: ${res.status} ${res.statusText}`)
 
-    const body = await res.json() as A2aResponse
-    if (body.error)
-      throw new Error(`ÆLLI A2A error: ${body.error.message ?? JSON.stringify(body.error)}`)
-
-    const text = extractText(body.result)
-    if (text === undefined)
-      throw new Error(`ÆLLI A2A response had no text part: ${JSON.stringify(body.result)}`)
-    return text
+    const recommendation = extractRecommendation(await res.text())
+    if (recommendation === undefined)
+      throw new Error('ÆLLI A2A response carried no recommendation')
+    return recommendation
   }
 }
