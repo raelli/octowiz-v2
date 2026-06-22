@@ -39,6 +39,19 @@ function resultChunk(recommendation: string): unknown {
   }
 }
 
+/** A result chunk with an explicit (non-completed) state — e.g. a progress frame. */
+function resultChunkState(recommendation: string, state: string): unknown {
+  return {
+    jsonrpc: '2.0',
+    id: 'x',
+    result: {
+      kind: 'task',
+      artifacts: [{ parts: [{ kind: 'text', text: JSON.stringify({ text: recommendation }) }] }],
+      status: { state },
+    },
+  }
+}
+
 /** The benign trailing error chunk the orchestrator stream appends — must be ignored. */
 const trailingErrorChunk = { jsonrpc: '2.0', id: 'x', error: { code: -32603, message: 'Expecting value: line 1 column 2 (char 1)' } }
 
@@ -70,6 +83,31 @@ describe('extractRecommendation (NDJSON message/stream)', () => {
 
   it('tolerates a `data:` SSE prefix', () => {
     expect(extractRecommendation(`data: ${JSON.stringify(resultChunk('ok'))}\n`)).toBe('ok')
+  })
+
+  it('throwson a real (non-benign) error chunk — even after a result (no stale success)', () => {
+    const body = ndjson(resultChunk('rerun'), { jsonrpc: '2.0', error: { code: 429, message: 'rate limit' } })
+    expect(() => extractRecommendation(body)).toThrow(/rate limit/)
+  })
+
+  it('throwson a real error chunk with no result', () => {
+    expect(() => extractRecommendation(ndjson({ error: { code: -32000, message: 'orchestration failed' } }))).toThrow(/orchestration failed/)
+  })
+
+  it('throwson a malformed (truncated) line', () => {
+    const body = `${JSON.stringify(resultChunk('x'))}\n{"error": broken\n`
+    expect(() => extractRecommendation(body)).toThrow(/malformed/)
+  })
+
+  it('prefers the completed result over a non-completed progress frame (either order)', () => {
+    expect(extractRecommendation(ndjson(resultChunkState('partial', 'working'), resultChunk('final')))).toBe('final')
+    expect(extractRecommendation(ndjson(resultChunk('final'), resultChunkState('partial', 'working')))).toBe('final')
+  })
+
+  it('preserves a richer JSON recommendation instead of stripping fields', () => {
+    const rich = JSON.stringify({ text: 'do X', why: 'Y' })
+    const chunk = { result: { artifacts: [{ parts: [{ kind: 'text', text: rich }] }], status: { state: 'completed' } } }
+    expect(extractRecommendation(ndjson(chunk))).toBe(rich)
   })
 })
 
@@ -126,5 +164,12 @@ describe('createA2aAelliClient', () => {
     const { impl } = fakeFetch(ndjson(trailingErrorChunk))
     const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', fetchImpl: impl })
     await expect(client(request())).rejects.toThrow(/no recommendation/)
+  })
+
+  it('uses message/send when transport:send is configured (escape hatch)', async () => {
+    const { impl, calls } = fakeFetch(ndjson(resultChunk('ok')))
+    const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', transport: 'send', fetchImpl: impl })
+    await client(request())
+    expect(JSON.parse(calls[0]!.init.body as string).method).toBe('message/send')
   })
 })
