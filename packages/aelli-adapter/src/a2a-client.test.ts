@@ -22,9 +22,17 @@ function fakeFetch(body: string, status = 200) {
 }
 
 describe('extractRecommendation (SSE)', () => {
-  it('reads a string field from the terminal data payload', () => {
-    const sse = 'data: {"phase":"think"}\n\ndata: {"recommendation":"rerun the failing checks"}\n\ndata: [DONE]\n'
+  it('reads the orchestrator { text } terminal payload, ignoring phase events', () => {
+    const sse = 'data: {"phase":"think"}\n\ndata: {"text":"rerun the failing checks"}\n\ndata: [DONE]\n'
     expect(extractRecommendation(sse)).toBe('rerun the failing checks')
+  })
+
+  it('prefers text over other fields', () => {
+    expect(extractRecommendation('data: {"text":"primary","recommendation":"secondary"}\n\ndata: [DONE]\n')).toBe('primary')
+  })
+
+  it('falls back to common fields (recommendation) for other agents', () => {
+    expect(extractRecommendation('data: {"recommendation":"rerun"}\n\ndata: [DONE]\n')).toBe('rerun')
   })
 
   it('uses a bare string data payload directly', () => {
@@ -36,8 +44,12 @@ describe('extractRecommendation (SSE)', () => {
     expect(extractRecommendation(sse)).toBe('merge after CI is green')
   })
 
-  it('throws on an error payload', () => {
+  it('throws on a truthy error payload', () => {
     expect(() => extractRecommendation('data: {"error":"unauthorized"}\n\ndata: [DONE]\n')).toThrow(/A2A error: unauthorized/)
+  })
+
+  it('does not throw on error:null (a success-envelope convention)', () => {
+    expect(extractRecommendation('data: {"error":null,"text":"ok"}\n\ndata: [DONE]\n')).toBe('ok')
   })
 
   it('returns undefined when the stream is empty', () => {
@@ -46,8 +58,8 @@ describe('extractRecommendation (SSE)', () => {
 })
 
 describe('createA2aAelliClient', () => {
-  it('posts the A2A envelope to the orchestrator and returns the recommendation', async () => {
-    const { impl, calls } = fakeFetch('data: {"recommendation":"rerun the failing checks"}\n\ndata: [DONE]\n')
+  it('posts a JSON {query,context} event to the orchestrator and returns the recommendation', async () => {
+    const { impl, calls } = fakeFetch('data: {"text":"rerun the failing checks"}\n\ndata: [DONE]\n')
     const client = createA2aAelliClient({
       baseUrl: 'https://llm.integrahub.de/',
       apiKey: 'sk-test',
@@ -59,7 +71,9 @@ describe('createA2aAelliClient', () => {
 
     const { url, init } = calls[0]!
     expect(url).toBe('https://llm.integrahub.de/a2a/aelli-orchestrator') // routed by agent name, slash trimmed
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test')
+    const headers = init.headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer sk-test')
+    expect(headers.Accept).toBe('text/event-stream')
     const payload = JSON.parse(init.body as string)
     expect(payload).toMatchObject({
       jsonrpc: '2.0',
@@ -68,16 +82,19 @@ describe('createA2aAelliClient', () => {
         message: {
           role: 'user', // required by the gateway
           messageId: 'fixed-id',
-          parts: [{ kind: 'text', text: 'Task "Do it" needs a decision: latest validation failed' }],
-          metadata: { capability: 'aelli.decide', source: 'octowiz-v2' },
+          metadata: { capability: 'aelli.decide', source: 'octowiz-v2', octowiz_doctrine: 'v1' },
         },
       },
     })
-    expect(payload.params.message.metadata.context.task.id).toBe('tk1')
+    // parts[0].text is a JSON event the orchestrator's parseEvent JSON.parses; it carries
+    // the query + the structured context (NOT a plain string).
+    const event = JSON.parse(payload.params.message.parts[0].text)
+    expect(event.query).toBe('Task "Do it" needs a decision: latest validation failed')
+    expect(event.context.task.id).toBe('tk1')
   })
 
   it('routes to a custom agent name when configured', async () => {
-    const { impl, calls } = fakeFetch('data: ok\n\ndata: [DONE]\n')
+    const { impl, calls } = fakeFetch('data: {"text":"ok"}\n\ndata: [DONE]\n')
     const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', agentName: 'aelli-dev-advisor', fetchImpl: impl })
     await client(request())
     expect(calls[0]!.url).toBe('https://x/a2a/aelli-dev-advisor')
