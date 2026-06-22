@@ -3,6 +3,8 @@ import type { Participant, ParticipantRole, ReviewVerdict, RoomState } from '@oc
 import { canReview } from '@octowiz/doctrine'
 import { ParticipantRoleSchema } from '@octowiz/schemas'
 
+export { type AelliRouterWorkerConfig, createAelliRouterWorker, parseRouterResult } from './aelli-router-worker'
+
 /** One of the assignable agent roles: every schema role except the non-agent `steward`. */
 export type AgentRole = Exclude<ParticipantRole, 'steward'>
 

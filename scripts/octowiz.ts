@@ -9,7 +9,7 @@ import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { buildEscalationRequest, createA2aAelliClient, recordAelliEscalation, shouldEscalate } from '@octowiz/aelli-adapter'
-import { createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
+import { createAelliRouterWorker, createLocalModelWorker, dispatchReview } from '@octowiz/agent-runtime'
 import { isMergeReady } from '@octowiz/doctrine'
 import { generatePullRequestBody, openPullRequestForBranch } from '@octowiz/github-adapter'
 import { startArgs } from '@octowiz/opencode-adapter'
@@ -309,7 +309,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   // A2A lives at the gateway ROOT, so strip the `/v1` chat-completions suffix off LITELLM_BASE_URL.
   const aelliBaseUrl = process.env.LITELLM_BASE_URL?.replace(/\/v1\/?$/, '')
   const aelliApiKey = process.env.LITELLM_API_KEY
-  const worker = createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
+  // Model worker: route implement/review through ÆLLI's router (generate -> review -> revise
+  // with built-in no-self-approval) when configured; else fall back to a local model CLI.
+  const worker = aelliBaseUrl && aelliApiKey
+    ? createAelliRouterWorker({ baseUrl: aelliBaseUrl, apiKey: aelliApiKey })
+    : createLocalModelWorker(defaultRun, { command: process.env.OCTOWIZ_MODEL_CMD ?? 'octowiz-model' })
   // Escalation seam: one A2A call to ÆLLI's orchestrator. Absent config, fail loud on use
   // (don't silently no-op) — escalations must not vanish.
   const aelliClient: AelliClient = aelliBaseUrl && aelliApiKey
