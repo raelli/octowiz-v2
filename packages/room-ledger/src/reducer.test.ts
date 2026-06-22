@@ -157,3 +157,53 @@ describe('applyEvent invariants', () => {
     expect(() => applyEvents([...withTask, escalation, { ...escalation, at: 't3' }])).toThrow()
   })
 })
+
+describe('advice.recorded', () => {
+  const at = '2026-06-22T00:00:00.000Z'
+  const room = { id: 'r1', name: 'Room', status: 'active' as const, createdAt: at }
+  const task = { id: 't1', roomId: 'r1', title: 'Task', status: 'open' as const }
+  const advice = {
+    id: 'adv1',
+    roomId: 'r1',
+    taskId: 't1',
+    advisorId: 'adv',
+    reviewerId: 'rev',
+    tier: 'cheap-model',
+    recommendation: 'do X',
+    verdict: 'approved' as const,
+    createdAt: at,
+  }
+
+  it('appends advice for a known task', () => {
+    const state = applyEvents([
+      { type: 'room.created', at, room },
+      { type: 'task.created', at, task },
+      { type: 'advice.recorded', at, advice },
+    ])
+    expect(state?.advice).toEqual([advice])
+  })
+
+  it('rejects advice for an unknown task', () => {
+    expect(() => applyEvents([
+      { type: 'room.created', at, room },
+      { type: 'advice.recorded', at, advice },
+    ])).toThrow(/unknown task/)
+  })
+
+  it('rejects a duplicate advice id', () => {
+    expect(() => applyEvents([
+      { type: 'room.created', at, room },
+      { type: 'task.created', at, task },
+      { type: 'advice.recorded', at, advice },
+      { type: 'advice.recorded', at, advice },
+    ])).toThrow(/duplicate advice id/)
+  })
+
+  it('rejects advice whose roomId does not match the room', () => {
+    expect(() => applyEvents([
+      { type: 'room.created', at, room },
+      { type: 'task.created', at, task },
+      { type: 'advice.recorded', at, advice: { ...advice, roomId: 'other' } },
+    ])).toThrow(/does not match room/)
+  })
+})

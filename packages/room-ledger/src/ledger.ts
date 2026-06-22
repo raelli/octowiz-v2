@@ -1,4 +1,5 @@
 import type {
+  Advice,
   Escalation,
   LedgerEvent,
   Participant,
@@ -72,6 +73,10 @@ export class RoomLedger {
 
   recordEscalation(roomId: string, escalation: Escalation, at: string): Promise<RoomState> {
     return this.appendAndProject(roomId, { type: 'escalation.recorded', at, escalation })
+  }
+
+  recordAdvice(roomId: string, advice: Advice, at: string): Promise<RoomState> {
+    return this.appendAndProject(roomId, { type: 'advice.recorded', at, advice })
   }
 
   recordSessionStart(roomId: string, tool: 'zellij' | 'opencode', sessionName: string, at: string): Promise<RoomState> {

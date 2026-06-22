@@ -14,6 +14,7 @@ function roomState(status: RoomState['room']['status']): RoomState {
     reviews: [],
     validations: [],
     escalations: [],
+    advice: [],
     sessions: [],
     sandboxes: [],
   }

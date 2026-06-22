@@ -5,7 +5,7 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
   if (state === null) {
     if (event.type !== 'room.created')
       throw new Error(`first event must be room.created, got "${event.type}"`)
-    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [], sessions: [], sandboxes: [] }
+    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [], advice: [], sessions: [], sandboxes: [] }
   }
 
   // Enforce domain invariants here so every write path (the RoomLedger preflight) and
@@ -57,6 +57,14 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
       if (state.escalations.some(e => e.id === event.escalation.id))
         throw new Error(`duplicate escalation id "${event.escalation.id}"`)
       return { ...state, escalations: [...state.escalations, event.escalation] }
+    case 'advice.recorded':
+      if (event.advice.roomId !== state.room.id)
+        throw new Error(`advice roomId \"${event.advice.roomId}\" does not match room \"${state.room.id}\"`)
+      if (!hasTask(event.advice.taskId))
+        throw new Error(`advice references unknown task \"${event.advice.taskId}\"`)
+      if (state.advice.some(a => a.id === event.advice.id))
+        throw new Error(`duplicate advice id \"${event.advice.id}\"`)
+      return { ...state, advice: [...state.advice, event.advice] }
     case 'session.started':
       if (event.roomId !== state.room.id)
         throw new Error(`session.started roomId "${event.roomId}" does not match room "${state.room.id}"`)
