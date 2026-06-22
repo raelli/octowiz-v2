@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "bash": {
+      "git push *": "deny"
+    }
+  },
+  "agent": {
+    "reviewer": {
+      "description": "Reviews changes against doctrine. Cannot edit — the no-self-review rule is enforced by permission, not by prompt.",
+      "mode": "subagent",
+      "permission": {
+        "edit": "deny"
+      }
+    }
+  }
+}
