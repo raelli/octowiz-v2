@@ -18,3 +18,4 @@ dist/
 
 # Octowiz local tooling state (generated per workspace/session)
 .octowiz/
+.claude/
