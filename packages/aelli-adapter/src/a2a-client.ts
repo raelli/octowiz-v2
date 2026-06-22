@@ -2,9 +2,13 @@ import type { AelliClient, AelliEscalationRequest } from './index'
 import { randomUUID } from 'node:crypto'
 
 /**
- * Config for the real ÆLLI seam: one A2A (JSON-RPC 2.0) `message/send` to the deployed brain.
+ * Config for the real ÆLLI seam: one A2A (JSON-RPC 2.0) `message/stream` to the deployed brain.
  * Mirrors the v0.9.23 plugin's `octowiz.escalate_to_aelli`, but goes through the LiteLLM
- * gateway, which routes by **agent name** (`/a2a/<agentName>`) and streams the reply as SSE.
+ * gateway, which routes by **agent name** (`/a2a/<agentName>`).
+ *
+ * Why `message/stream` (not `message/send`): the gateway's `message/send` path `json.loads()`
+ * the orchestrator's SSE body and errors (`char 0`); its `message/stream` path streams the
+ * reply as NDJSON and works. See raelli/llm_custom #23 (the `message/send` gateway bug).
  */
 export interface A2aClientConfig {
   /** Gateway A2A base, e.g. `https://llm.integrahub.de` (NOT the `/v1` chat-completions base). */
@@ -21,62 +25,104 @@ export interface A2aClientConfig {
   timeoutMs?: number
 }
 
-/**
- * The gateway streams Server-Sent Events: `data: <json>` lines terminated by `data: [DONE]`.
- * The orchestrator's `dispatchSSE` emits `data: ${JSON.stringify(artifact)}`, and its `handle()`
- * returns `{ text }` — so the terminal payload is `{ text: "<recommendation>" }`. Pull `.text`
- * first, then fall back defensively (other agents / shapes): common text fields, a bare A2A
- * message's `parts[0].text`, else the stringified payload.
- */
-export function extractRecommendation(body: string): string | undefined {
-  let last: unknown
-  for (const line of body.split(/\r?\n/)) {
-    if (!line.startsWith('data:'))
-      continue
-    const payload = line.slice(5).trim()
-    if (payload === '' || payload === '[DONE]')
-      continue
-    try {
-      last = JSON.parse(payload)
-    }
-    catch {
-      // A non-JSON data line: keep the raw text as a candidate.
-      last = payload
-    }
-  }
-  if (last === undefined)
+/** First `text` string across an A2A `parts` array, if any. */
+function partsText(parts: unknown): string | undefined {
+  if (!Array.isArray(parts))
     return undefined
-  if (typeof last === 'string')
-    return last.trim() === '' ? undefined : last
-  if (typeof last === 'object' && last !== null) {
-    const o = last as Record<string, unknown>
-    if (o.error)
-      throw new Error(`ÆLLI A2A error: ${typeof o.error === 'string' ? o.error : JSON.stringify(o.error)}`)
-    for (const key of ['text', 'recommendation', 'decision', 'answer', 'output', 'message'] as const) {
-      if (typeof o[key] === 'string' && (o[key] as string).trim() !== '')
-        return o[key] as string
-    }
-    // Bare A2A message: { parts: [{ kind: 'text', text }] }
-    const parts = (o as { parts?: unknown[] }).parts
-    if (Array.isArray(parts)) {
-      const part = parts.find(p => typeof (p as { text?: unknown })?.text === 'string') as { text?: string } | undefined
-      if (part?.text)
-        return part.text
-    }
-    return JSON.stringify(last)
-  }
-  return undefined
+  const part = parts.find(p => typeof (p as { text?: unknown })?.text === 'string') as { text?: string } | undefined
+  return part?.text
 }
 
 /**
- * Build the real `AelliClient`: POST an escalation to ÆLLI's orchestrator and return its
+ * The orchestrator's artifact text is itself a JSON string `{"text":"<recommendation>"}`
+ * (its `handle()` returns `{ text }`, double-encoded into the part). Unwrap that; if it isn't
+ * such a JSON object, use the raw string.
+ */
+function unwrapArtifactText(raw: string): string {
+  const t = raw.trim()
+  if (t.startsWith('{')) {
+    try {
+      const inner = JSON.parse(t) as { text?: unknown }
+      if (typeof inner.text === 'string' && inner.text.trim() !== '')
+        return inner.text
+    }
+    catch {
+      // not a JSON wrapper — fall through to the raw string
+    }
+  }
+  return raw
+}
+
+/** Pull a recommendation out of one NDJSON JSON-RPC chunk, or undefined if it carries none. */
+function chunkRecommendation(chunk: unknown): string | undefined {
+  if (typeof chunk !== 'object' || chunk === null)
+    return undefined
+  const c = chunk as {
+    result?: { artifacts?: { parts?: unknown[] }[], parts?: unknown[] }
+    text?: unknown
+    recommendation?: unknown
+    parts?: unknown
+  }
+  // message/stream result chunk: result.artifacts[0].parts[0].text (a JSON string {"text":...}).
+  const r = c.result
+  let raw = (r && typeof r === 'object')
+    ? (partsText(r.artifacts?.[0]?.parts) ?? partsText(r.parts))
+    : undefined
+  // Defensive fallbacks for other agents / shapes: bare {text}/{recommendation}, or bare parts.
+  if (raw === undefined && typeof c.text === 'string')
+    raw = c.text
+  if (raw === undefined && typeof c.recommendation === 'string')
+    raw = c.recommendation
+  if (raw === undefined)
+    raw = partsText(c.parts)
+  if (raw === undefined || raw.trim() === '')
+    return undefined
+  return unwrapArtifactText(raw)
+}
+
+/**
+ * Parse the gateway's `message/stream` reply (NDJSON: one JSON-RPC chunk per line) and return
+ * the recommendation. The orchestrator emits a result chunk carrying the artifact, optionally
+ * followed by a **benign trailing error chunk** — that trailer is IGNORED (a chunk with no
+ * recommendation is simply skipped). Returns the last recommendation found, or undefined if the
+ * stream carried none (the caller fails closed). A `data:` SSE prefix is tolerated too.
+ */
+export function extractRecommendation(body: string): string | undefined {
+  let last: string | undefined
+  for (const line of body.split(/\r?\n/)) {
+    let payload = line.trim()
+    if (payload === '' || payload === '[DONE]')
+      continue
+    if (payload.startsWith('data:'))
+      payload = payload.slice(5).trim()
+    if (payload === '' || payload === '[DONE]')
+      continue
+    let chunk: unknown
+    try {
+      chunk = JSON.parse(payload)
+    }
+    catch {
+      continue
+    }
+    const rec = chunkRecommendation(chunk)
+    if (rec !== undefined)
+      last = rec
+    // chunks with no recommendation (status updates, the trailing error chunk) are ignored.
+  }
+  return last
+}
+
+/**
+ * Build the real `AelliClient`: stream an escalation to ÆLLI's orchestrator and return its
  * recommendation. The orchestrator's `parseEvent` does `JSON.parse(parts[0].text)` and reads
  * `{ query, context }`, so the question + the structured `AelliEscalationRequest` travel as a
  * JSON-stringified **event** (NOT a plain string — a plain string fails `JSON.parse` → 400).
  * `metadata` carries the octowiz tag so the octowiz system prompt is injected server-side.
  *
- * Fails closed, matching `recordAelliEscalation`: a non-2xx, an A2A error, or a response with
- * no recommendation all throw, so a lost recommendation never looks like success.
+ * Uses `message/stream` to dodge the gateway's `message/send` SSE-parse bug (llm_custom #23).
+ *
+ * Fails closed, matching `recordAelliEscalation`: a non-2xx or a stream with no recommendation
+ * throws, so a lost recommendation never looks like success.
  */
 export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
   const fetchImpl = config.fetchImpl ?? fetch
@@ -91,7 +137,7 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
     const event = { query, context: request }
     const payload = {
       jsonrpc: '2.0',
-      method: 'message/send',
+      method: 'message/stream',
       id: newId(),
       params: {
         message: {
@@ -124,7 +170,7 @@ export function createA2aAelliClient(config: A2aClientConfig): AelliClient {
 
     const recommendation = extractRecommendation(await res.text())
     if (recommendation === undefined)
-      throw new Error('ÆLLI A2A response carried no recommendation')
+      throw new Error('ÆLLI A2A stream carried no recommendation')
     return recommendation
   }
 }

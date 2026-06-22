@@ -21,45 +21,61 @@ function fakeFetch(body: string, status = 200) {
   return { impl, calls }
 }
 
-describe('extractRecommendation (SSE)', () => {
-  it('reads the orchestrator { text } terminal payload, ignoring phase events', () => {
-    const sse = 'data: {"phase":"think"}\n\ndata: {"text":"rerun the failing checks"}\n\ndata: [DONE]\n'
-    expect(extractRecommendation(sse)).toBe('rerun the failing checks')
+/** NDJSON stream: one JSON-RPC chunk per line (the gateway's `message/stream` shape). */
+function ndjson(...chunks: unknown[]): string {
+  return `${chunks.map(c => JSON.stringify(c)).join('\n')}\n`
+}
+
+/** A result chunk whose artifact text is the orchestrator's double-encoded `{"text":...}`. */
+function resultChunk(recommendation: string): unknown {
+  return {
+    jsonrpc: '2.0',
+    id: 'x',
+    result: {
+      kind: 'task',
+      artifacts: [{ artifactId: 'a', name: 'advisory', parts: [{ kind: 'text', text: JSON.stringify({ text: recommendation }) }] }],
+      status: { state: 'completed' },
+    },
+  }
+}
+
+/** The benign trailing error chunk the orchestrator stream appends — must be ignored. */
+const trailingErrorChunk = { jsonrpc: '2.0', id: 'x', error: { code: -32603, message: 'Expecting value: line 1 column 2 (char 1)' } }
+
+describe('extractRecommendation (NDJSON message/stream)', () => {
+  it('extracts the recommendation from the result chunk and IGNORES the trailing error chunk', () => {
+    const body = ndjson(resultChunk('rerun the failing checks'), trailingErrorChunk)
+    expect(extractRecommendation(body)).toBe('rerun the failing checks')
   })
 
-  it('prefers text over other fields', () => {
-    expect(extractRecommendation('data: {"text":"primary","recommendation":"secondary"}\n\ndata: [DONE]\n')).toBe('primary')
+  it('unwraps the double-encoded artifact text ({"text":...})', () => {
+    expect(extractRecommendation(ndjson(resultChunk('merge after CI is green')))).toBe('merge after CI is green')
   })
 
-  it('falls back to common fields (recommendation) for other agents', () => {
-    expect(extractRecommendation('data: {"recommendation":"rerun"}\n\ndata: [DONE]\n')).toBe('rerun')
+  it('uses a non-JSON artifact text directly', () => {
+    const chunk = { result: { artifacts: [{ parts: [{ kind: 'text', text: 'just merge' }] }] } }
+    expect(extractRecommendation(ndjson(chunk))).toBe('just merge')
   })
 
-  it('uses a bare string data payload directly', () => {
-    expect(extractRecommendation('data: proceed with caution\n\ndata: [DONE]\n')).toBe('proceed with caution')
+  it('falls back to bare {text} / {recommendation} chunks (other agents)', () => {
+    expect(extractRecommendation(ndjson({ text: 'rerun' }))).toBe('rerun')
+    expect(extractRecommendation(ndjson({ recommendation: 'escalate' }))).toBe('escalate')
   })
 
-  it('falls back to an A2A message parts[].text', () => {
-    const sse = 'data: {"parts":[{"kind":"text","text":"merge after CI is green"}]}\n\ndata: [DONE]\n'
-    expect(extractRecommendation(sse)).toBe('merge after CI is green')
+  it('returns undefined when the stream carries only an error / nothing usable', () => {
+    expect(extractRecommendation(ndjson(trailingErrorChunk))).toBeUndefined()
+    expect(extractRecommendation('[DONE]\n')).toBeUndefined()
+    expect(extractRecommendation('\n\n')).toBeUndefined()
   })
 
-  it('throws on a truthy error payload', () => {
-    expect(() => extractRecommendation('data: {"error":"unauthorized"}\n\ndata: [DONE]\n')).toThrow(/A2A error: unauthorized/)
-  })
-
-  it('does not throw on error:null (a success-envelope convention)', () => {
-    expect(extractRecommendation('data: {"error":null,"text":"ok"}\n\ndata: [DONE]\n')).toBe('ok')
-  })
-
-  it('returns undefined when the stream is empty', () => {
-    expect(extractRecommendation('data: [DONE]\n')).toBeUndefined()
+  it('tolerates a `data:` SSE prefix', () => {
+    expect(extractRecommendation(`data: ${JSON.stringify(resultChunk('ok'))}\n`)).toBe('ok')
   })
 })
 
 describe('createA2aAelliClient', () => {
-  it('posts a JSON {query,context} event to the orchestrator and returns the recommendation', async () => {
-    const { impl, calls } = fakeFetch('data: {"text":"rerun the failing checks"}\n\ndata: [DONE]\n')
+  it('streams a JSON {query,context} event to the orchestrator and returns the recommendation', async () => {
+    const { impl, calls } = fakeFetch(ndjson(resultChunk('rerun the failing checks'), trailingErrorChunk))
     const client = createA2aAelliClient({
       baseUrl: 'https://llm.integrahub.de/',
       apiKey: 'sk-test',
@@ -77,7 +93,7 @@ describe('createA2aAelliClient', () => {
     const payload = JSON.parse(init.body as string)
     expect(payload).toMatchObject({
       jsonrpc: '2.0',
-      method: 'message/send',
+      method: 'message/stream', // NOT message/send — dodges the gateway SSE-parse bug (#23)
       params: {
         message: {
           role: 'user', // required by the gateway
@@ -94,7 +110,7 @@ describe('createA2aAelliClient', () => {
   })
 
   it('routes to a custom agent name when configured', async () => {
-    const { impl, calls } = fakeFetch('data: {"text":"ok"}\n\ndata: [DONE]\n')
+    const { impl, calls } = fakeFetch(ndjson(resultChunk('ok')))
     const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', agentName: 'aelli-dev-advisor', fetchImpl: impl })
     await client(request())
     expect(calls[0]!.url).toBe('https://x/a2a/aelli-dev-advisor')
@@ -106,8 +122,8 @@ describe('createA2aAelliClient', () => {
     await expect(client(request())).rejects.toThrow(/A2A call failed: 503/)
   })
 
-  it('throws when the stream carries no recommendation', async () => {
-    const { impl } = fakeFetch('data: [DONE]\n')
+  it('throws when the stream carries no recommendation (only a trailing error)', async () => {
+    const { impl } = fakeFetch(ndjson(trailingErrorChunk))
     const client = createA2aAelliClient({ baseUrl: 'https://x', apiKey: 'k', fetchImpl: impl })
     await expect(client(request())).rejects.toThrow(/no recommendation/)
   })
