@@ -11,6 +11,9 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.17.9"
+  },
   "devDependencies": {
     "@octowiz/config-typescript": "workspace:*",
     "@types/node": "catalog:",

@@ -3,6 +3,15 @@ export interface TaskContext {
   description?: string
 }
 
+export type {
+  OpencodeEngine,
+  OpencodeSessionHandle,
+} from './driver'
+export {
+  createDefaultEngine,
+  driveSession,
+} from './driver'
+
 /**
  * Build the argv to launch OpenCode against a repo with task context. Pure builder —
  * the CLI spawns this via zellij.runInSession; nothing here spawns a process, and this
