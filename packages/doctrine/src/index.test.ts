@@ -16,6 +16,7 @@ function baseState(): RoomState {
     advice: [],
     sessions: [],
     sandboxes: [],
+    actions: [],
   }
 }
 

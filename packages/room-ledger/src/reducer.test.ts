@@ -62,6 +62,35 @@ describe('applyEvent', () => {
   it('returns null for an empty event log', () => {
     expect(applyEvents([])).toBeNull()
   })
+
+  it('initializes actions to empty on room.created', () => {
+    expect(applyEvent(null, created).actions).toEqual([])
+  })
+
+  it('appends an action on action.recorded with a taskId', () => {
+    const state = applyEvents([
+      created,
+      { type: 'task.created', at: 't1', task: { id: 'tk1', roomId: 'r1', title: 'X', status: 'open' } },
+      { type: 'action.recorded', at: 't2', roomId: 'r1', taskId: 'tk1', tool: 'bash', summary: 'pnpm test' },
+    ])!
+    expect(state.actions).toEqual([{ tool: 'bash', summary: 'pnpm test', taskId: 'tk1', at: 't2' }])
+  })
+
+  it('appends an action on action.recorded without a taskId', () => {
+    const state = applyEvents([
+      created,
+      { type: 'action.recorded', at: 't1', roomId: 'r1', tool: 'bash', summary: 'pnpm test' },
+    ])!
+    expect(state.actions).toEqual([{ tool: 'bash', summary: 'pnpm test', taskId: undefined, at: 't1' }])
+  })
+
+  it('folds an old ledger without action events (backward-compat)', () => {
+    const state = applyEvents([
+      created,
+      { type: 'session.started', at: 't1', roomId: 'r1', tool: 'zellij', sessionName: 'octowiz-r1' },
+    ])!
+    expect(state.actions).toEqual([])
+  })
 })
 
 describe('applyEvent invariants', () => {
@@ -135,6 +164,18 @@ describe('applyEvent invariants', () => {
     expect(() => applyEvents(join(
       { type: 'sandbox.started', at: 't1', roomId: 'other', provider: 'podman', sandboxId: 'abc123' },
     ))).toThrow()
+  })
+
+  it('rejects an action.recorded whose roomId does not match the room', () => {
+    expect(() => applyEvents(join(
+      { type: 'action.recorded', at: 't1', roomId: 'other', tool: 'bash', summary: 'pnpm test' },
+    ))).toThrow(/does not match room/)
+  })
+
+  it('rejects an action.recorded referencing an unknown task', () => {
+    expect(() => applyEvents(join(
+      { type: 'action.recorded', at: 't1', roomId: 'r1', taskId: 'ghost', tool: 'bash', summary: 'pnpm test' },
+    ))).toThrow(/unknown task/)
   })
 
   const withTask: LedgerEvent[] = [

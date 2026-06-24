@@ -58,8 +58,46 @@ describe('schemas', () => {
       advice: [],
       sessions,
       sandboxes,
+      actions: [],
     })
     expect(state.sessions).toEqual(sessions)
     expect(state.sandboxes).toEqual(sandboxes)
+  })
+
+  it('parses an action.recorded event with a taskId', () => {
+    const event = { type: 'action.recorded', at: '2026-06-21T00:00:00Z', roomId: 'r1', taskId: 'tk1', tool: 'bash', summary: 'pnpm test' }
+    expect(LedgerEventSchema.parse(event)).toEqual(event)
+  })
+
+  it('parses an action.recorded event without a taskId', () => {
+    const event = { type: 'action.recorded', at: '2026-06-21T00:00:00Z', roomId: 'r1', tool: 'bash', summary: 'pnpm test' }
+    expect(LedgerEventSchema.parse(event)).toEqual(event)
+  })
+
+  it('rejects action.recorded missing a required field', () => {
+    const bad = { type: 'action.recorded', at: '2026-06-21T00:00:00Z', roomId: 'r1', tool: 'bash' }
+    expect(() => LedgerEventSchema.parse(bad)).toThrow()
+  })
+
+  it('rejects action.recorded with an empty roomId', () => {
+    const bad = { type: 'action.recorded', at: '2026-06-21T00:00:00Z', roomId: '', tool: 'bash', summary: 'pnpm test' }
+    expect(() => LedgerEventSchema.parse(bad)).toThrow()
+  })
+
+  it('accepts a RoomState with actions', () => {
+    const actions = [{ tool: 'bash', summary: 'pnpm test', taskId: 'tk1', at: '2026-06-21T00:00:00Z' }]
+    const state = RoomStateSchema.parse({
+      room: { id: 'r1', name: 'R', status: 'active', createdAt: '2026-06-21T00:00:00Z' },
+      participants: [],
+      tasks: [],
+      reviews: [],
+      validations: [],
+      escalations: [],
+      advice: [],
+      sessions: [],
+      sandboxes: [],
+      actions,
+    })
+    expect(state.actions).toEqual(actions)
   })
 })

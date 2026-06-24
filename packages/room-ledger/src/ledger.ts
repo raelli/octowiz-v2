@@ -86,4 +86,8 @@ export class RoomLedger {
   recordSandboxStart(roomId: string, provider: string, sandboxId: string, at: string): Promise<RoomState> {
     return this.appendAndProject(roomId, { type: 'sandbox.started', at, roomId, provider, sandboxId })
   }
+
+  recordAction(roomId: string, tool: string, summary: string, at: string, taskId?: string): Promise<RoomState> {
+    return this.appendAndProject(roomId, { type: 'action.recorded', at, roomId, tool, summary, taskId })
+  }
 }

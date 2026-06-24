@@ -5,7 +5,7 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
   if (state === null) {
     if (event.type !== 'room.created')
       throw new Error(`first event must be room.created, got "${event.type}"`)
-    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [], advice: [], sessions: [], sandboxes: [] }
+    return { room: event.room, participants: [], tasks: [], reviews: [], validations: [], escalations: [], advice: [], sessions: [], sandboxes: [], actions: [] }
   }
 
   // Enforce domain invariants here so every write path (the RoomLedger preflight) and
@@ -73,6 +73,12 @@ export function applyEvent(state: RoomState | null, event: LedgerEvent): RoomSta
       if (event.roomId !== state.room.id)
         throw new Error(`sandbox.started roomId "${event.roomId}" does not match room "${state.room.id}"`)
       return { ...state, sandboxes: [...state.sandboxes, { provider: event.provider, sandboxId: event.sandboxId, at: event.at }] }
+    case 'action.recorded':
+      if (event.roomId !== state.room.id)
+        throw new Error(`action.recorded roomId "${event.roomId}" does not match room "${state.room.id}"`)
+      if (event.taskId !== undefined && !hasTask(event.taskId))
+        throw new Error(`action.recorded references unknown task "${event.taskId}"`)
+      return { ...state, actions: [...state.actions, { tool: event.tool, summary: event.summary, taskId: event.taskId, at: event.at }] }
   }
 }
 

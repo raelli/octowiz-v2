@@ -37,6 +37,26 @@ describe('roomLedger preflight', () => {
     expect(state.sessions).toEqual([{ tool: 'zellij', sessionName: 'octowiz-r1', at: 't1' }])
   })
 
+  it('records an action and projects it into room state', async () => {
+    const ledger = await freshLedger()
+    await ledger.createRoom({ id: 'r1', name: 'Room', status: 'active', createdAt: 't0' }, 't0')
+    await ledger.createTask({ id: 'tk1', roomId: 'r1', title: 'X', status: 'open' }, 't1')
+    const state = await ledger.recordAction('r1', 'bash', 'pnpm test', 't2', 'tk1')
+    expect(state.actions).toEqual([{ tool: 'bash', summary: 'pnpm test', taskId: 'tk1', at: 't2' }])
+  })
+
+  it('records an action without a taskId', async () => {
+    const ledger = await freshLedger()
+    await ledger.createRoom({ id: 'r1', name: 'Room', status: 'active', createdAt: 't0' }, 't0')
+    const state = await ledger.recordAction('r1', 'bash', 'pnpm test', 't1')
+    expect(state.actions).toEqual([{ tool: 'bash', summary: 'pnpm test', taskId: undefined, at: 't1' }])
+  })
+
+  it('rejects recordAction for an unknown room', async () => {
+    const ledger = await freshLedger()
+    await expect(ledger.recordAction('ghost', 'bash', 'pnpm test', 't1')).rejects.toThrow()
+  })
+
   it('recordAdvice projects approved advice into room state', async () => {
     const at = '2026-06-22T00:00:00.000Z'
     const ledger = await freshLedger()
