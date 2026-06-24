@@ -4,6 +4,17 @@ export interface TaskContext {
 }
 
 export type {
+  RecordAction,
+  StreamActionsOptions,
+  ToolEvent,
+} from './action-stream'
+export {
+  streamActionsToLedger,
+  subscribeToolEvents,
+  summariseToolInput,
+  toToolEvent,
+} from './action-stream'
+export type {
   OpencodeEngine,
   OpencodeSessionHandle,
 } from './driver'
