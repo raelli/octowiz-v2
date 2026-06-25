@@ -15,6 +15,14 @@ export {
   toToolEvent,
 } from './action-stream'
 export type {
+  AdvisoryOptions,
+  AelliAdvisor,
+} from './advisory'
+export {
+  adviseBeforeTool,
+  resolveAdvisoryTimeoutMs,
+} from './advisory'
+export type {
   OpencodeEngine,
   OpencodeSessionHandle,
 } from './driver'
