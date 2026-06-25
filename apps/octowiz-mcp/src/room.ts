@@ -2,6 +2,9 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { basename, dirname } from 'node:path'
+import type { RoomLedger } from '@octowiz/room-ledger'
 
 const execFileAsync = promisify(execFile)
 
@@ -35,4 +38,23 @@ export function makeLedgerResolver(opts: { listRoots?: ListRoots, cwd: string })
     cached = join(root, '.octowiz', 'ledger')
     return cached
   }
+}
+
+export async function ensureRoom(ledger: RoomLedger, repoRoot: string, now: () => string): Promise<string> {
+  const pointer = join(repoRoot, '.octowiz', 'room.json')
+  try {
+    const { roomId } = JSON.parse(await readFile(pointer, 'utf8')) as { roomId?: string }
+    if (roomId && await ledger.getState(roomId)) return roomId
+  }
+  catch { /* no pointer yet, or stale -> recreate */ }
+
+  const at = now()
+  const id = `r${at.replace(/[^a-z0-9]/gi, '').slice(-10)}`
+  await ledger.createRoom({ id, name: basename(repoRoot), status: 'active', createdAt: at }, at)
+  await ledger.addParticipant(id, { id: 'opencode', kind: 'agent', roles: ['advisor'], displayName: 'opencode session' }, at)
+  await ledger.recordSessionStart(id, 'opencode', `octowiz-${id}`, at)
+
+  await mkdir(dirname(pointer), { recursive: true })
+  await writeFile(pointer, `${JSON.stringify({ roomId: id }, null, 2)}\n`)
+  return id
 }
