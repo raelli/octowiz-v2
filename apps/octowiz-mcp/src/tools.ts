@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { type Ctx, type ToolResult, okText, errText, failOpen } from './context.js'
+import { runValidation, DEFAULT_CHECKS } from '@octowiz/validation'
+import { isMergeReady } from '@octowiz/doctrine'
+import type { Run } from './run.js'
 
 export async function roomStatusHandler(getCtx: () => Promise<Ctx>): Promise<ToolResult> {
   const { ledger, roomId } = await getCtx()
@@ -64,7 +67,23 @@ export async function recordHandler(getCtx: () => Promise<Ctx>, now: () => strin
   }
 }
 
-export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now: () => string): void {
+export async function validateHandler(getCtx: () => Promise<Ctx>, now: () => string, run: Run, args: { taskId: string }): Promise<ToolResult> {
+  const { ledger, roomId } = await getCtx()
+  const at = now()
+  const validation = await runValidation(args.taskId, DEFAULT_CHECKS, run, at)
+  await ledger.recordValidation(roomId, validation, at)
+  if (validation.status === 'passed') await ledger.setTaskStatus(roomId, args.taskId, 'validated', at)
+  return okText(JSON.stringify(validation, null, 2))
+}
+
+export async function mergeReadyHandler(getCtx: () => Promise<Ctx>, args: { taskId: string }): Promise<ToolResult> {
+  const { ledger, roomId } = await getCtx()
+  const state = await ledger.getState(roomId)
+  if (!state) return errText(`room ${roomId} not found`)
+  return okText(JSON.stringify(isMergeReady(state, args.taskId), null, 2))
+}
+
+export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now: () => string, run: Run): void {
   server.registerTool(
     'octowiz_room_status',
     {
@@ -80,5 +99,15 @@ export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now
       inputSchema: recordInput,
     },
     failOpen(async (args: RecordArgs) => recordHandler(getCtx, now, args)),
+  )
+  server.registerTool(
+    'octowiz_validate',
+    { description: 'Run lint/type-check/test for a task, record the validation, advance to validated if passed.', inputSchema: { taskId: z.string() } },
+    failOpen(async (args: { taskId: string }) => validateHandler(getCtx, now, run, args)),
+  )
+  server.registerTool(
+    'octowiz_merge_ready',
+    { description: 'Doctrine gate: is a task merge-ready? (passing validation + a qualified non-self approval).', inputSchema: { taskId: z.string() } },
+    failOpen(async (args: { taskId: string }) => mergeReadyHandler(getCtx, args)),
   )
 }

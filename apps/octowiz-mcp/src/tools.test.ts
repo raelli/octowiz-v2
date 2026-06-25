@@ -3,7 +3,8 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { RoomLedger, FileLedgerStore } from '@octowiz/room-ledger'
-import { roomStatusHandler, recordHandler } from './tools.js'
+import { roomStatusHandler, recordHandler, validateHandler, mergeReadyHandler } from './tools.js'
+import type { Run } from './run.js'
 
 async function fixtureCtx() {
   const root = await mkdtemp(join(tmpdir(), 'octowiz-tools-'))
@@ -48,5 +49,32 @@ describe('octowiz_record', () => {
     expect(r.isError).toBeFalsy()
     const state = await ctx.ledger.getState('r1')
     expect(state?.actions.at(-1)?.summary).toBe('edited server.ts')
+  })
+})
+
+describe('octowiz_validate', () => {
+  it('runs checks via an injected Run and records a passing validation', async () => {
+    const ctx = await fixtureCtx()
+    const now = () => '2026-06-25T00:03:00.000Z'
+    await recordHandler(async () => ctx, now, { kind: 'task_created', title: 't' })
+    const taskId = (await ctx.ledger.getState('r1'))!.tasks.at(-1)!.id
+    const passRun: Run = async () => ({ code: 0, stdout: 'ok', stderr: '' })
+    const r = await validateHandler(async () => ctx, now, passRun, { taskId })
+    expect(r.isError).toBeFalsy()
+    const state = await ctx.ledger.getState('r1')
+    expect(state?.validations.at(-1)?.status).toBe('passed')
+  })
+})
+
+describe('octowiz_merge_ready', () => {
+  it('reports not-ready with reasons for a fresh task', async () => {
+    const ctx = await fixtureCtx()
+    const now = () => '2026-06-25T00:04:00.000Z'
+    await recordHandler(async () => ctx, now, { kind: 'task_created', title: 't' })
+    const taskId = (await ctx.ledger.getState('r1'))!.tasks.at(-1)!.id
+    const r = await mergeReadyHandler(async () => ctx, { taskId })
+    const parsed = JSON.parse(r.content[0]!.text)
+    expect(parsed.ready).toBe(false)
+    expect(Array.isArray(parsed.reasons)).toBe(true)
   })
 })
