@@ -1,0 +1,28 @@
+{
+  "name": "@octowiz/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "octowiz-mcp": "./src/index.ts" },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@octowiz/schemas": "workspace:*",
+    "@octowiz/room-ledger": "workspace:*",
+    "@octowiz/doctrine": "workspace:*",
+    "@octowiz/validation": "workspace:*",
+    "@octowiz/skill-runtime": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@octowiz/config-typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
