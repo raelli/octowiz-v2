@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { RoomLedger, FileLedgerStore } from '@octowiz/room-ledger'
-import { roomStatusHandler, recordHandler, validateHandler, mergeReadyHandler } from './tools.js'
+import { roomStatusHandler, recordHandler, validateHandler, mergeReadyHandler, selectSkillsHandler } from './tools.js'
 import type { Run } from './run.js'
 
 async function fixtureCtx() {
@@ -76,5 +77,18 @@ describe('octowiz_merge_ready', () => {
     const parsed = JSON.parse(r.content[0]!.text)
     expect(parsed.ready).toBe(false)
     expect(Array.isArray(parsed.reasons)).toBe(true)
+  })
+})
+
+describe('octowiz_select_skills', () => {
+  it('returns skills for a stage from the real registry', async () => {
+    const ctx = await fixtureCtx()
+    // octowiz-v2 repo root from this test file: apps/octowiz-mcp/src -> ../../../
+    const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+    const registry = join(repoRoot, 'skills', 'registry.json')
+    const r = await selectSkillsHandler(async () => ctx, registry, { stage: 'review' })
+    expect(r.isError).toBeFalsy()
+    const skills = JSON.parse(r.content[0]!.text)
+    expect(Array.isArray(skills)).toBe(true)
   })
 })

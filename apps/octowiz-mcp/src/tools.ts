@@ -1,9 +1,11 @@
+import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { type Ctx, type ToolResult, okText, errText, failOpen } from './context.js'
 import { runValidation, DEFAULT_CHECKS } from '@octowiz/validation'
 import { isMergeReady } from '@octowiz/doctrine'
 import type { Run } from './run.js'
+import { loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
 
 export async function roomStatusHandler(getCtx: () => Promise<Ctx>): Promise<ToolResult> {
   const { ledger, roomId } = await getCtx()
@@ -83,7 +85,18 @@ export async function mergeReadyHandler(getCtx: () => Promise<Ctx>, args: { task
   return okText(JSON.stringify(isMergeReady(state, args.taskId), null, 2))
 }
 
-export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now: () => string, run: Run): void {
+export async function selectSkillsHandler(
+  getCtx: () => Promise<Ctx>,
+  registryPath: string,
+  args: { stage: 'plan' | 'implement' | 'review' | 'validate' | 'escalate' | 'deliver', role?: string[] },
+): Promise<ToolResult> {
+  await getCtx() // ensures a room exists / consistent with other tools
+  const skills = await loadApprovedSkills(p => readFile(p, 'utf8'), registryPath)
+  const selected = selectSkills(skills, { stage: args.stage, role: args.role })
+  return okText(JSON.stringify(selected, null, 2))
+}
+
+export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now: () => string, run: Run, registryPath: string): void {
   server.registerTool(
     'octowiz_room_status',
     {
@@ -109,5 +122,13 @@ export function registerTools(server: McpServer, getCtx: () => Promise<Ctx>, now
     'octowiz_merge_ready',
     { description: 'Doctrine gate: is a task merge-ready? (passing validation + a qualified non-self approval).', inputSchema: { taskId: z.string() } },
     failOpen(async (args: { taskId: string }) => mergeReadyHandler(getCtx, args)),
+  )
+  server.registerTool(
+    'octowiz_select_skills',
+    {
+      description: 'Skills relevant to the current workflow stage from the approved registry.',
+      inputSchema: { stage: z.enum(['plan', 'implement', 'review', 'validate', 'escalate', 'deliver']), role: z.array(z.string()).optional() },
+    },
+    failOpen(async (args: { stage: any, role?: string[] }) => selectSkillsHandler(getCtx, registryPath, args)),
   )
 }
