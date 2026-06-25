@@ -1,9 +1,9 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { join, dirname } from 'node:path'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { makeContext } from './context.js'
-import { registerTools } from './tools.js'
 import { defaultRun } from './run.js'
+import { registerTools } from './tools.js'
 
 export interface ServerDeps {
   /** Resolve the ledger directory for the active repo (caches internally). */

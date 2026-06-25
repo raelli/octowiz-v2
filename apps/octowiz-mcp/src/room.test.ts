@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
-import { resolveRepoRoot } from './room.js'
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+
+import { join } from 'node:path'
+import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
+import { describe, expect, it } from 'vitest'
+import { ensureRoom, resolveRepoRoot } from './room.js'
 
 describe('resolveRepoRoot', () => {
   it('prefers the first file:// MCP root', async () => {
@@ -14,12 +19,6 @@ describe('resolveRepoRoot', () => {
     expect(root).toBe('/tmp')
   })
 })
-
-import { mkdtemp, readFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { RoomLedger, FileLedgerStore } from '@octowiz/room-ledger'
-import { ensureRoom } from './room.js'
 
 describe('ensureRoom', () => {
   it('creates a room + opencode participant on first call and reuses it after', async () => {

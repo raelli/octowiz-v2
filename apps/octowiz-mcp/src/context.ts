@@ -1,9 +1,9 @@
-import { RoomLedger, FileLedgerStore } from '@octowiz/room-ledger'
 import type { ServerDeps } from './server.js'
+import { FileLedgerStore, RoomLedger } from '@octowiz/room-ledger'
 import { ensureRoom } from './room.js'
 
 export interface Ctx { ledger: RoomLedger, roomId: string }
-export type ToolResult = { content: { type: 'text', text: string }[], isError?: boolean }
+export interface ToolResult { [x: string]: unknown, content: { type: 'text', text: string }[], isError?: boolean }
 
 export function okText(text: string): ToolResult {
   return { content: [{ type: 'text', text }] }
@@ -28,7 +28,8 @@ export function failOpen<A>(fn: (args: A) => Promise<ToolResult>): (args: A) => 
 export function makeContext(deps: ServerDeps): () => Promise<Ctx> {
   let cached: Ctx | undefined
   return async () => {
-    if (cached) return cached
+    if (cached)
+      return cached
     const ledgerDir = await deps.ledgerDirFor()
     const ledger = new RoomLedger(new FileLedgerStore(ledgerDir))
     // repoRoot for ensureRoom = parent of `<root>/.octowiz/ledger`

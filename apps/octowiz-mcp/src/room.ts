@@ -1,10 +1,9 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
-import { fileURLToPath } from 'node:url'
-import { join } from 'node:path'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
 import type { RoomLedger } from '@octowiz/room-ledger'
+import { execFile } from 'node:child_process'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
@@ -16,14 +15,16 @@ export async function resolveRepoRoot(listRoots: ListRoots | undefined, cwd: str
     try {
       const { roots } = await listRoots()
       const first = roots.find(r => r.uri.startsWith('file://'))
-      if (first) return fileURLToPath(first.uri)
+      if (first)
+        return fileURLToPath(first.uri)
     }
     catch { /* fall through to git/cwd */ }
   }
   try {
     const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel'], { cwd })
     const top = stdout.trim()
-    if (top) return top
+    if (top)
+      return top
   }
   catch { /* not a git repo */ }
   return cwd
@@ -33,7 +34,8 @@ export function makeLedgerResolver(opts: { listRoots?: ListRoots, cwd: string })
   // ponytail: cache repo root for the session; re-resolve on roots/list_changed when multi-project-per-session matters
   let cached: string | undefined
   return async () => {
-    if (cached) return cached
+    if (cached)
+      return cached
     const root = await resolveRepoRoot(opts.listRoots, opts.cwd)
     cached = join(root, '.octowiz', 'ledger')
     return cached
@@ -44,7 +46,8 @@ export async function ensureRoom(ledger: RoomLedger, repoRoot: string, now: () =
   const pointer = join(repoRoot, '.octowiz', 'room.json')
   try {
     const { roomId } = JSON.parse(await readFile(pointer, 'utf8')) as { roomId?: string }
-    if (roomId && await ledger.getState(roomId)) return roomId
+    if (roomId && await ledger.getState(roomId))
+      return roomId
   }
   catch { /* no pointer yet, or stale -> recreate */ }
 

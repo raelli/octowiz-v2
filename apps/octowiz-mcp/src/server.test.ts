@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { createServer, type ServerDeps } from './server.js'
+import type { ServerDeps } from './server.js'
+import { describe, expect, it } from 'vitest'
+import { createServer } from './server.js'
 
 function fakeDeps(): ServerDeps {
   return {

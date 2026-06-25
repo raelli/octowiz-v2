@@ -1,16 +1,18 @@
-import { readFile } from 'node:fs/promises'
-import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { type Ctx, type ToolResult, okText, errText, failOpen } from './context.js'
-import { runValidation, DEFAULT_CHECKS } from '@octowiz/validation'
-import { isMergeReady } from '@octowiz/doctrine'
+import type { Ctx, ToolResult } from './context.js'
 import type { Run } from './run.js'
+import { readFile } from 'node:fs/promises'
+import { isMergeReady } from '@octowiz/doctrine'
 import { loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
+import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
+import { z } from 'zod'
+import { errText, failOpen, okText } from './context.js'
 
 export async function roomStatusHandler(getCtx: () => Promise<Ctx>): Promise<ToolResult> {
   const { ledger, roomId } = await getCtx()
   const state = await ledger.getState(roomId)
-  if (!state) return errText(`room ${roomId} not found`)
+  if (!state)
+    return errText(`room ${roomId} not found`)
   return okText(JSON.stringify(state, null, 2))
 }
 
@@ -31,38 +33,47 @@ const recordInput = {
   summary: z.string().optional(),
 }
 
-type RecordArgs = {
+interface RecordArgs {
   kind: 'task_created' | 'task_status' | 'review' | 'action'
-  title?: string, description?: string
-  taskId?: string, status?: 'open' | 'in_progress' | 'in_review' | 'validated' | 'merged' | 'blocked'
-  reviewerId?: string, verdict?: 'approved' | 'rejected' | 'changes_requested', notes?: string
-  tool?: string, summary?: string
+  title?: string
+  description?: string
+  taskId?: string
+  status?: 'open' | 'in_progress' | 'in_review' | 'validated' | 'merged' | 'blocked'
+  reviewerId?: string
+  verdict?: 'approved' | 'rejected' | 'changes_requested'
+  notes?: string
+  tool?: string
+  summary?: string
 }
 
 export async function recordHandler(getCtx: () => Promise<Ctx>, now: () => string, args: RecordArgs): Promise<ToolResult> {
   const { ledger, roomId } = await getCtx()
   const at = now()
-  const idFrom = (p: string) => `${p}${at.replace(/[^a-z0-9]/gi, '').slice(-10)}`
+  const idFrom = (p: string): string => `${p}${at.replace(/[^a-z0-9]/gi, '').slice(-10)}`
   switch (args.kind) {
     case 'task_created': {
-      if (!args.title) return errText('task_created requires `title`')
+      if (!args.title)
+        return errText('task_created requires `title`')
       const task = { id: idFrom('t'), roomId, title: args.title, description: args.description, status: 'open' as const }
       await ledger.createTask(task, at)
       return okText(`task ${task.id} created`)
     }
     case 'task_status': {
-      if (!args.taskId || !args.status) return errText('task_status requires `taskId` and `status`')
+      if (!args.taskId || !args.status)
+        return errText('task_status requires `taskId` and `status`')
       await ledger.setTaskStatus(roomId, args.taskId, args.status, at)
       return okText(`task ${args.taskId} -> ${args.status}`)
     }
     case 'review': {
-      if (!args.taskId || !args.reviewerId || !args.verdict) return errText('review requires `taskId`, `reviewerId`, `verdict`')
+      if (!args.taskId || !args.reviewerId || !args.verdict)
+        return errText('review requires `taskId`, `reviewerId`, `verdict`')
       const review = { id: idFrom('rv'), taskId: args.taskId, reviewerId: args.reviewerId, verdict: args.verdict, notes: args.notes, createdAt: at }
       await ledger.recordReview(roomId, review, at)
       return okText(`review ${review.id} (${args.verdict}) recorded`)
     }
     case 'action': {
-      if (!args.tool || !args.summary) return errText('action requires `tool` and `summary`')
+      if (!args.tool || !args.summary)
+        return errText('action requires `tool` and `summary`')
       await ledger.recordAction(roomId, args.tool, args.summary, at, args.taskId)
       return okText('action recorded')
     }
@@ -74,14 +85,16 @@ export async function validateHandler(getCtx: () => Promise<Ctx>, now: () => str
   const at = now()
   const validation = await runValidation(args.taskId, DEFAULT_CHECKS, run, at)
   await ledger.recordValidation(roomId, validation, at)
-  if (validation.status === 'passed') await ledger.setTaskStatus(roomId, args.taskId, 'validated', at)
+  if (validation.status === 'passed')
+    await ledger.setTaskStatus(roomId, args.taskId, 'validated', at)
   return okText(JSON.stringify(validation, null, 2))
 }
 
 export async function mergeReadyHandler(getCtx: () => Promise<Ctx>, args: { taskId: string }): Promise<ToolResult> {
   const { ledger, roomId } = await getCtx()
   const state = await ledger.getState(roomId)
-  if (!state) return errText(`room ${roomId} not found`)
+  if (!state)
+    return errText(`room ${roomId} not found`)
   return okText(JSON.stringify(isMergeReady(state, args.taskId), null, 2))
 }
 
