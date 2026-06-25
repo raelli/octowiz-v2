@@ -1,4 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { fileURLToPath } from 'node:url'
+import { join, dirname } from 'node:path'
+import { makeContext } from './context.js'
+import { registerTools } from './tools.js'
+import { defaultRun } from './run.js'
 
 export interface ServerDeps {
   /** Resolve the ledger directory for the active repo (caches internally). */
@@ -11,8 +16,11 @@ export interface ServerDeps {
   now: () => string
 }
 
-export function createServer(_deps: ServerDeps): McpServer {
+export function createServer(deps: ServerDeps): McpServer {
   const server = new McpServer({ name: 'octowiz', version: '0.1.0' })
-  // tools registered in later tasks
+  const getCtx = makeContext(deps)
+  // octowiz-v2 repo root from this file: apps/octowiz-mcp/src -> ../../../
+  const registryPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'skills', 'registry.json')
+  registerTools(server, getCtx, deps.now, defaultRun, registryPath)
   return server
 }
