@@ -3,7 +3,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { RoomLedger, FileLedgerStore } from '@octowiz/room-ledger'
-import { roomStatusHandler } from './tools.js'
+import { roomStatusHandler, recordHandler } from './tools.js'
 
 async function fixtureCtx() {
   const root = await mkdtemp(join(tmpdir(), 'octowiz-tools-'))
@@ -21,5 +21,32 @@ describe('octowiz_room_status', () => {
     const state = JSON.parse(r.content[0]!.text)
     expect(state.room.id).toBe('r1')
     expect(state.room.name).toBe('demo')
+  })
+})
+
+describe('octowiz_record', () => {
+  it('records a task_created event', async () => {
+    const ctx = await fixtureCtx()
+    const now = () => '2026-06-25T00:01:00.000Z'
+    const r = await recordHandler(async () => ctx, now, {
+      kind: 'task_created', title: 'wire mcp', description: 'expose tools',
+    })
+    expect(r.isError).toBeFalsy()
+    const state = await ctx.ledger.getState('r1')
+    expect(state?.tasks.at(-1)?.title).toBe('wire mcp')
+  })
+
+  it('records an action milestone tied to a task', async () => {
+    const ctx = await fixtureCtx()
+    const now = () => '2026-06-25T00:02:00.000Z'
+    await recordHandler(async () => ctx, now, { kind: 'task_created', title: 't' })
+    const state0 = await ctx.ledger.getState('r1')
+    const taskId = state0!.tasks.at(-1)!.id
+    const r = await recordHandler(async () => ctx, now, {
+      kind: 'action', tool: 'opencode', summary: 'edited server.ts', taskId,
+    })
+    expect(r.isError).toBeFalsy()
+    const state = await ctx.ledger.getState('r1')
+    expect(state?.actions.at(-1)?.summary).toBe('edited server.ts')
   })
 })
