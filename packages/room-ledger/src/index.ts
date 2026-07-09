@@ -1,4 +1,5 @@
 export { RoomLedger } from './ledger'
 export { applyEvent, applyEvents } from './reducer'
+export { ConcurrentWriteError, SqliteLedgerStore } from './sqlite-store'
 export { FileLedgerStore } from './store'
 export type { LedgerStore } from './store'

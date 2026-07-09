@@ -33,13 +33,12 @@ export class RoomLedger {
     if (projected === null)
       throw new Error(`room "${roomId}" has no state after applying ${parsed.type}`)
 
-    // ponytail: PRECONDITION — single writer per room. The read-validate-append window is
-    // not atomic across concurrent RoomLedger instances or processes, so two writers can
-    // both validate against the same log and append conflicting events (e.g. duplicate
-    // ids), corrupting the replay. A per-instance lock would not help the multiplayer
-    // topology (separate instances/processes). The real fix is a transactional backend:
-    // swap FileLedgerStore for the SQLite LedgerStore when concurrent writers are needed.
-    await this.store.appendEvent(roomId, parsed)
+    // The read-validate-append window is guarded by expectedCount: a transactional
+    // backend (SqliteLedgerStore) commits only if the log is still `events.length`
+    // long, so a racing writer gets a ConcurrentWriteError instead of corrupting the
+    // replay. FileLedgerStore ignores the guard — its single-writer-per-room
+    // precondition stands; use SqliteLedgerStore when concurrent writers are needed.
+    await this.store.appendEvent(roomId, parsed, events.length)
     return projected
   }
 

@@ -5,7 +5,13 @@ import { SCHEMAS_VERSION, StoredLedgerEventSchema } from '@octowiz/schemas'
 
 /** Storage backend for a room's append-only event log. Backend-agnostic by design. */
 export interface LedgerStore {
-  appendEvent: (roomId: string, event: LedgerEvent) => Promise<void>
+  /**
+   * Append one event. Stores with transactional backends honor `expectedCount`:
+   * the write commits only if the room's log is still exactly that long
+   * (optimistic concurrency). FileLedgerStore ignores it — its documented
+   * single-writer-per-room precondition stands.
+   */
+  appendEvent: (roomId: string, event: LedgerEvent, expectedCount?: number) => Promise<void>
   readEvents: (roomId: string) => Promise<LedgerEvent[]>
   listRooms: () => Promise<string[]>
 }
@@ -22,7 +28,7 @@ function isENOENT(error: unknown): boolean {
  * absolute paths) — the id reaches us across a trust boundary (it comes from parsed
  * events / callers), so this is enforced before any path is derived.
  */
-function assertSafeRoomId(roomId: string): void {
+export function assertSafeRoomId(roomId: string): void {
   if (roomId.trim() === '' || roomId === '.' || roomId === '..' || isAbsolute(roomId) || /[/\\]/.test(roomId))
     throw new Error(`unsafe room id: ${JSON.stringify(roomId)}`)
 }
