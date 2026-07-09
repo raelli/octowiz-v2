@@ -62,12 +62,46 @@ export async function streamActionsToLedger(
   }
 }
 
+// The ledger is plaintext and long-lived, so summaries must never carry
+// credentials verbatim. Two layers: secret-named keys are redacted wholesale,
+// and string values are scrubbed for credential-shaped substrings (auth
+// headers, NAME=value env assignments, well-known key prefixes).
+// ponytail: high-signal patterns only, not a secret scanner — entropy-based
+// detection can come from a real secretlint pass if leaks still slip through.
+const SECRET_KEY = /(?:token|secret|password|passwd|credential|api[-_]?key|authorization)$/i
+const ENV_ASSIGNMENT = /(\w*(?:token|secret|password|passwd|api[-_]?key|credential)\w*)=\S+/gi
+const CREDENTIAL_SHAPES = [
+  /\bBearer\s+[\w.~+/=-]+/gi, // Authorization header values
+  /\bsk-[\w-]{8,}/g, // OpenAI/Anthropic/Stripe-style
+  /\bgh[pousr]_[A-Z0-9]{16,}/gi, // GitHub tokens
+  /\bgithub_pat_\w{20,}/g,
+  /\bxox[baprs]-[\w-]{4,}/g, // Slack
+  /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
+]
+
+function scrubString(value: string): string {
+  const envScrubbed = value.replace(ENV_ASSIGNMENT, '$1=[redacted]')
+  return CREDENTIAL_SHAPES.reduce((acc, shape) => acc.replace(shape, '[redacted]'), envScrubbed)
+}
+
+function redactSecrets(value: unknown): unknown {
+  if (typeof value === 'string')
+    return scrubString(value)
+  if (Array.isArray(value))
+    return value.map(redactSecrets)
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) =>
+      SECRET_KEY.test(key) ? [key, '[redacted]'] : [key, redactSecrets(nested)]))
+  }
+  return value
+}
+
 /**
- * Deterministic, pure summary of a tool's input: compact JSON, truncated to keep
- * the ledger entry small. Tested directly.
+ * Deterministic, pure summary of a tool's input: compact JSON with secrets
+ * redacted, truncated to keep the ledger entry small. Tested directly.
  */
 export function summariseToolInput(input: Record<string, unknown>): string {
-  return JSON.stringify(input).slice(0, 200)
+  return JSON.stringify(redactSecrets(input)).slice(0, 200)
 }
 
 /**

@@ -97,6 +97,45 @@ describe('summariseToolInput', () => {
     const out = summariseToolInput(big)
     expect(out.length).toBeLessThanOrEqual(200)
   })
+
+  // The ledger is plaintext and long-lived — tool inputs must never carry
+  // credentials into it verbatim.
+  it('redacts values of secret-named keys, including nested ones', () => {
+    const out = summariseToolInput({
+      apiKey: 'sk-abc123',
+      headers: { Authorization: 'Bearer xyz', accept: 'application/json' },
+      path: 'a.ts',
+    })
+    expect(out).not.toContain('sk-abc123')
+    expect(out).not.toContain('Bearer xyz')
+    expect(out).toContain('[redacted]')
+    expect(out).toContain('application/json') // non-secret sibling survives
+    expect(out).toContain('a.ts')
+  })
+
+  it('scrubs credential-shaped substrings inside string values', () => {
+    const out = summariseToolInput({
+      command: 'curl -H "Authorization: Bearer sk-live-Abc123XYZssecret" https://api.example.com',
+    })
+    expect(out).not.toContain('sk-live-Abc123XYZssecret')
+    expect(out).toContain('curl')
+    expect(out).toContain('https://api.example.com')
+
+    const env = summariseToolInput({ command: 'AELLI_AUTH_TOKEN=supersecretvalue node run.js' })
+    expect(env).not.toContain('supersecretvalue')
+    expect(env).toContain('node run.js')
+  })
+
+  it('scrubs well-known key prefixes (github, slack, aws)', () => {
+    // Canary fixtures assembled at runtime so the repo's own secretlint
+    // pre-commit gate doesn't flag them as real credentials.
+    const github = ['ghp', '16C7e42F292c6912E7710c838347Ae178B4a'].join('_')
+    const slackThenAws = ['xoxb', '2534', 'and', 'AKIAIOSFODNN7EXAMPLE'].join('-')
+    const out = summariseToolInput({ command: `echo ${github} && echo ${slackThenAws}` })
+    expect(out).not.toContain(github)
+    expect(out).not.toContain('AKIAIOSFODNN7EXAMPLE')
+    expect(out).not.toContain(['xoxb', '2534'].join('-'))
+  })
 })
 
 /** Build a synthetic SDK message.part.updated Event around a ToolPart. */
