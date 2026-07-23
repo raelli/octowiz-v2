@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ensureSession, runInSession, sessionName } from './index'
+import { buildSshArgs, createSshRun, ensureSession, quoteArg, runInSession, sessionName } from './index'
 
 const ok = { code: 0, stdout: '', stderr: '' }
 
@@ -63,5 +63,77 @@ describe('runInSession', () => {
   it('throws when the launch fails', async () => {
     const run = vi.fn().mockResolvedValue({ code: 1, stdout: '', stderr: 'nope' })
     await expect(runInSession('r1', ['echo'], run)).rejects.toThrow(/nope/)
+  })
+})
+
+describe('quoteArg (ssh-run seam)', () => {
+  it('wraps a plain token in single quotes', () => {
+    expect(quoteArg('zellij')).toBe(`'zellij'`)
+  })
+  it('preserves a token with spaces as one quoted token', () => {
+    expect(quoteArg('Room r1')).toBe(`'Room r1'`)
+  })
+  it('quotes an empty token so it survives re-tokenization', () => {
+    expect(quoteArg('')).toBe(`''`)
+  })
+  it('escapes an embedded single quote via the backslash-quote idiom', () => {
+    expect(quoteArg(`it's`)).toBe(`'it'\\''s'`)
+  })
+})
+
+describe('buildSshArgs', () => {
+  it('builds ssh host -- <quoted remote command>', () => {
+    expect(buildSshArgs('elli', undefined, 'zellij', ['list-sessions', '-n', '-s']))
+      .toEqual(['elli', '--', `'zellij' 'list-sessions' '-n' '-s'`])
+  })
+  it('prepends -o options before the host', () => {
+    expect(buildSshArgs('elli', { options: { ConnectTimeout: '10' } }, 'zellij', ['run']))
+      .toEqual(['-o', 'ConnectTimeout=10', 'elli', '--', `'zellij' 'run'`])
+  })
+  it('quotes argv containing spaces and --', () => {
+    expect(buildSshArgs('elli', undefined, 'zellij', ['--session', 'octowiz-r1', 'run', '--', 'echo', 'Room r1']))
+      .toEqual(['elli', '--', `'zellij' '--session' 'octowiz-r1' 'run' '--' 'echo' 'Room r1'`])
+  })
+})
+
+describe('createSshRun', () => {
+  it('returns code 0 + captured output on a successful remote command', async () => {
+    const seen: string[][] = []
+    const exec = async (sshArgs: string[]) => {
+      seen.push(sshArgs)
+      return { stdout: 'octowiz-elli\n', stderr: '' }
+    }
+    const run = createSshRun('elli', {}, exec)
+    const res = await run('zellij', ['list-sessions', '-n', '-s'])
+    expect(res).toEqual({ code: 0, stdout: 'octowiz-elli\n', stderr: '' })
+    expect(seen[0]).toEqual(['elli', '--', `'zellij' 'list-sessions' '-n' '-s'`])
+  })
+  it('maps a non-zero remote exit to {code,stdout,stderr} without rejecting', async () => {
+    const exec = async () => {
+      // mimics execFile's rejection shape on non-zero exit
+      const e: Error & { code?: number, stdout?: string, stderr?: string } = Object.assign(
+        new Error('Command failed: ssh …'),
+        { code: 255, stdout: '', stderr: 'Permission denied (publickey).' },
+      )
+      throw e
+    }
+    const run = createSshRun('elli', {}, exec)
+    await expect(run('zellij', ['attach', '--create-background', 'octowiz-r1']))
+      .resolves
+      .toEqual({ code: 255, stdout: '', stderr: 'Permission denied (publickey).' })
+  })
+  it('is usable as the run seam for ensureSession on a remote host', async () => {
+    const calls: string[][] = []
+    const exec = async (sshArgs: string[]) => {
+      calls.push(sshArgs)
+      // first call = list-sessions (reports an existing session → no create), then nothing
+      return { stdout: 'octowiz-r1\n', stderr: '' }
+    }
+    const sshRun = createSshRun('elli', {}, exec)
+    const { ensureSession } = await import('./index')
+    await ensureSession('r1', sshRun)
+    expect(calls).toHaveLength(1)
+    expect(calls[0]![0]).toBe('elli')
+    expect(calls[0]![2]).toContain(`'list-sessions'`)
   })
 })
