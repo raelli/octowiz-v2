@@ -19,7 +19,7 @@ import { selectProvider } from '@octowiz/sandbox-runtime'
 import { ReviewVerdictSchema } from '@octowiz/schemas'
 import { defaultReadFile, loadApprovedSkills, selectSkills } from '@octowiz/skill-runtime'
 import { DEFAULT_CHECKS, runValidation } from '@octowiz/validation'
-import { ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
+import { createSshRun, ensureSession, runInSession, sessionName } from '@octowiz/zellij-adapter'
 import { gitDiff } from './git-diff'
 import { orchestrate } from './orchestrate'
 
@@ -43,6 +43,10 @@ export interface Deps {
   aelliClient: AelliClient
   readFile: ReadFile
   skillRegistryPath: string
+  // The run used for the room's zellij legs. Defaults to `run` (local). Set to an
+  // SSH run (createSshRun) when `--host` routes the room to a remote machine (M3);
+  // the sandbox/worker legs still use `run`.
+  zellijRun?: Run
   // Injectable so tests/acceptance supply trivial real-`pnpm` checks instead of recursively
   // running the monorepo suite; defaults to the validation package's DEFAULT_CHECKS.
   checks: Check[]
@@ -81,7 +85,7 @@ function flag(values: Record<string, unknown>, name: string): string {
 
 export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
   const [subcommand, ...rest] = argv
-  const { ledger, run, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS, gatewayWorker, review } = deps
+  const { ledger, run, zellijRun, now, provider, worker, aelliClient, readFile, skillRegistryPath, checks = DEFAULT_CHECKS, gatewayWorker, review } = deps
   const { values } = parseArgs({
     args: rest,
     options: {
@@ -99,6 +103,7 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       stage: { type: 'string' },
       branch: { type: 'string' },
       base: { type: 'string' },
+      host: { type: 'string' },
     },
     allowPositionals: false,
   })
@@ -136,9 +141,11 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
       // does not exist in-container and podman create fails.
       const sandbox = await provider.create(roomId)
       await ledger.recordSandboxStart(roomId, sandbox.provider, sandbox.id, now())
-      await ensureSession(roomId, run)
+      // Room zellij legs run on the host named by --host (SSH) or locally (default).
+      const zRun = zellijRun ?? run
+      await ensureSession(roomId, zRun)
       await ledger.recordSessionStart(roomId, 'zellij', name, now())
-      await runInSession(roomId, startArgs(repo, { title: `Room ${roomId}` }), run)
+      await runInSession(roomId, startArgs(repo, { title: `Room ${roomId}` }), zRun)
       return ledger.recordSessionStart(roomId, 'opencode', name, now())
     }
     case 'assign': {
@@ -356,6 +363,11 @@ export async function runCli(argv: string[], deps: Deps): Promise<RoomState> {
 // pathToFileURL handles paths with spaces/special chars that a raw `file://` would not.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const argv = process.argv.slice(2)
+  // --host routes the room's zellij legs to a remote machine over SSH (the M3 room
+  // flow). The sandbox/worker legs still run locally; only the zellij host changes.
+  const hostFlagIdx = argv.indexOf('--host')
+  const sshHost = hostFlagIdx !== -1 ? argv[hostFlagIdx + 1] : undefined
+  const zellijRun = sshHost ? createSshRun(sshHost) : defaultRun
   const ledger = new RoomLedger(new FileLedgerStore(DEFAULT_LEDGER_DIR))
   const provider = selectProvider('auto', defaultRun)
   // Real ÆLLI seams talk to the deployed brain through the LiteLLM gateway when configured.
@@ -390,6 +402,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   runCli(argv, {
     ledger,
     run: defaultRun,
+    zellijRun,
     now: () => new Date().toISOString(),
     provider,
     worker,

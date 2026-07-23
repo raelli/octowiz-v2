@@ -537,3 +537,29 @@ describe('errors', () => {
     await expect(runCli(['create-room'], deps)).rejects.toThrow(/--name/)
   })
 })
+
+describe('start --host (SSH-run seam)', () => {
+  it('routes the zellij legs through deps.zellijRun, not the sandbox run', async () => {
+    const { ledger, deps, run } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Remote'], deps)
+    const roomId = created.room.id
+    // A distinct run seam standing in for createSshRun('elli'); the sandbox `run` stays local.
+    const zellijRun = vi.fn().mockResolvedValue({ code: 0, stdout: '', stderr: '' })
+    await runCli(['start', '--host', 'elli', '--room', roomId, '--repo', '/Users/elli/Projects/app'], { ...deps, zellijRun })
+    const after = await ledger.getState(roomId)
+    // zellij + opencode session legs recorded as before…
+    expect(after?.sessions.map(s => s.tool)).toEqual(['zellij', 'opencode'])
+    // …but they were dispatched over the zellij (SSH) seam, not the sandbox run.
+    expect(zellijRun).toHaveBeenCalled()
+    const zellijCalls = zellijRun.mock.calls.filter(([cmd]) => cmd === 'zellij')
+    expect(zellijCalls.length).toBeGreaterThanOrEqual(1)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the local run when no zellijRun is provided', async () => {
+    const { deps, run } = await fixture()
+    const created = await runCli(['create-room', '--name', 'Local'], deps)
+    await runCli(['start', '--room', created.room.id, '--repo', '/repos/app'], deps)
+    expect(run.mock.calls.some(([cmd]) => cmd === 'zellij')).toBe(true)
+  })
+})
